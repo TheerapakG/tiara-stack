@@ -1,0 +1,50 @@
+infisical:
+  enabled: true
+  projectId: 55408658-aa53-475f-9ac6-e1bfa9e207fe
+  connection:
+    address: https://infisical.theerapakg.moe
+
+ingress:
+  enabled: true
+  name: theerapakg-moe-ingress
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  tls:
+    - secretName: theerapakg-moe-tls
+      hosts:
+        - auth.theerapakg.moe
+        - schedule.theerapakg.moe
+        - sheet.theerapakg.moe
+        - zero.theerapakg.moe
+  hosts:
+    - host: auth.theerapakg.moe
+      path: /
+      pathType: Prefix
+      serviceName: sheet-auth-service
+      servicePort: 80
+    - host: sheet.theerapakg.moe
+      path: /
+      pathType: Prefix
+      serviceName: sheet-ingress-server-service
+      servicePort: 80
+    - host: schedule.theerapakg.moe
+      path: /
+      pathType: Prefix
+      serviceName: sheet-web-service
+      servicePort: 80
+    - host: zero.theerapakg.moe
+      path: /
+      pathType: Prefix
+      serviceName: zero-cache-service
+      servicePort: 4848
+
+global:
+  caCertificate:
+    enabled: true
+    existingConfigMap: tiara-stack-ca-certificate
+
+zeroCache:
+  persistence:
+    # DigitalOcean-specific storage class. Replace for other providers, or
+    # leave empty to use the cluster default.
+    storageClassName: do-block-storage

@@ -1,0 +1,13 @@
+{{- if and .Values.global.caCertificate.enabled (not .Values.global.caCertificate.existingConfigMap) }}
+{{- $root := . -}}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "tiara-stack.caConfigMapName" (dict "root" $root) }}
+  labels:
+    {{- include "tiara-stack.labels" $root | nindent 4 }}
+data:
+  {{ $root.Values.global.caCertificate.key | quote }}: |
+{{ required "global.caCertificate.value is required when global.caCertificate.enabled=true and existingConfigMap is empty" $root.Values.global.caCertificate.value | indent 4 }}
+{{- end }}

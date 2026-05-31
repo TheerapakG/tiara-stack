@@ -1,0 +1,60 @@
+{{- if .Values.services.sheetCluster.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "tiara-stack.fullname" . }}-sheet-cluster-runner-health
+  labels:
+    {{- include "tiara-stack.labels" . | nindent 4 }}
+    app: sheet-cluster
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "tiara-stack.fullname" . }}-sheet-cluster-runner-health
+  labels:
+    {{- include "tiara-stack.labels" . | nindent 4 }}
+    app: sheet-cluster
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "tiara-stack.sheetClusterName" . }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "tiara-stack.fullname" . }}-sheet-cluster-runner-health
+{{- end }}
+{{- if .Values.zeroCache.enabled }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "tiara-stack.fullname" . }}-zero-cache-jwks-reader
+  labels:
+    {{- include "tiara-stack.labels" . | nindent 4 }}
+    app: {{ include "tiara-stack.zeroCacheName" . }}
+rules:
+  - nonResourceURLs:
+      - /openid/v1/jwks
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "tiara-stack.fullname" . }}-zero-cache-jwks-reader
+  labels:
+    {{- include "tiara-stack.labels" . | nindent 4 }}
+    app: {{ include "tiara-stack.zeroCacheName" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "tiara-stack.zeroCacheName" . }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "tiara-stack.fullname" . }}-zero-cache-jwks-reader
+{{- end }}

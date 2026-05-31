@@ -1,0 +1,40 @@
+{{- if .Values.monitoring.serviceMonitor.enabled }}
+{{- $root := . -}}
+{{- range $svc := include "tiara-stack.serviceSpecs" . | fromYamlArray }}
+{{- $serviceValues := (index ($root.Values.services | default dict) $svc.key) | default dict -}}
+{{- if and $serviceValues.enabled (dig "serviceMonitor" "enabled" false $serviceValues) }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ $svc.name }}
+  labels:
+    {{- include "tiara-stack.labels" $root | nindent 4 }}
+    app: {{ $svc.name }}
+    release: {{ required "monitoring.serviceMonitor.releaseLabel is required" $root.Values.monitoring.serviceMonitor.releaseLabel | quote }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ $svc.name }}
+      app.kubernetes.io/instance: {{ $root.Release.Name }}
+  endpoints:
+    - port: {{ $svc.metricPortName }}
+      {{- with $serviceValues.serviceMonitor.path }}
+      path: {{ . | quote }}
+      {{- end }}
+      {{- with $serviceValues.serviceMonitor.interval }}
+      interval: {{ . | quote }}
+      {{- end }}
+      {{- with $serviceValues.serviceMonitor.scrapeTimeout }}
+      scrapeTimeout: {{ . | quote }}
+      {{- end }}
+      {{- with $serviceValues.serviceMonitor.scheme }}
+      scheme: {{ . | quote }}
+      {{- end }}
+      {{- with $serviceValues.serviceMonitor.tlsConfig }}
+      tlsConfig:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

@@ -5,7 +5,13 @@ export default defineConfig({
     "*": "vp check --fix",
   },
   fmt: {
-    ignorePatterns: ["packages/sheet-web/src/routeTree.gen.ts", "dist", ".output", "node_modules"],
+    ignorePatterns: [
+      "packages/sheet-web/src/routeTree.gen.ts",
+      "charts/tiara-stack/templates",
+      "dist",
+      ".output",
+      "node_modules",
+    ],
   },
   lint: {
     ignorePatterns: [".output", "dist", "node_modules"],

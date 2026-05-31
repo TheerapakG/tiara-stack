@@ -37,6 +37,8 @@ auth.key
 auth.key.pub
 volume.yaml
 k8s/**/ca-certificate.crt
+deploy/compose/secrets/**
+!deploy/compose/secrets/.gitkeep
 
 .nx/cache
 .nx/workspace-data

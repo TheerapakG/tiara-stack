@@ -1,0 +1,25 @@
+TiaraStack has been deployed.
+
+Verify the external Kubernetes Secrets referenced by values.yaml exist before
+the workloads start. See the chart README for the required secret keys:
+  helm show readme <repo>/{{ .Chart.Name }} --version {{ .Chart.Version }}
+  helm show readme {{ .Chart.Name }} --repo <repo-url> --version {{ .Chart.Version }}
+  helm show readme ./charts/{{ .Chart.Name }}
+  helm show readme oci://registry.example.com/repo/{{ .Chart.Name }}:{{ .Chart.Version }}
+
+{{- if .Values.infisical.enabled }}
+infisical.enabled=true, so the Infisical secrets operator must already be
+installed before this chart. This chart does not install the operator. Create
+the machine identity credentials referenced by values.yaml if they do not
+already exist.
+{{- end }}
+
+Troubleshooting missing secrets:
+  kubectl get secret <name> -n {{ .Release.Namespace }}
+Recreate or resync any missing secret, then retry the Helm upgrade.
+
+Show installed manifests:
+  helm get manifest {{ .Release.Name }} -n {{ .Release.Namespace }}
+
+Render from a chart reference:
+  helm template {{ .Release.Name }} ./charts/{{ .Chart.Name }}

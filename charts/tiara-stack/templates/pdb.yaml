@@ -1,0 +1,20 @@
+{{- $root := . -}}
+{{- range $svc := include "tiara-stack.serviceSpecs" . | fromYamlArray }}
+{{- $serviceValues := (index ($root.Values.services | default dict) $svc.key) | default dict -}}
+{{- $replicas := int (default 1 $serviceValues.replicas) -}}
+{{- if and $serviceValues.enabled (gt $replicas 1) }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $svc.name }}-pdb
+  labels:
+    {{- include "tiara-stack.labels" $root | nindent 4 }}
+    app: {{ $svc.name }}
+spec:
+  maxUnavailable: {{ default 1 $root.Values.pdb.maxUnavailable }}
+  selector:
+    matchLabels:
+      {{- include "tiara-stack.selectorLabels" (dict "root" $root "name" $svc.name) | nindent 6 }}
+{{- end }}
+{{- end }}

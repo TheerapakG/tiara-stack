@@ -1,0 +1,41 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "tiara-stack.ingressName" . }}
+  labels:
+    {{- include "tiara-stack.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- with .Values.ingress.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- if not .Values.ingress.hosts }}
+    {{- fail "ingress.hosts must contain at least one host when ingress.enabled=true" }}
+    {{- end }}
+    {{- range .Values.ingress.hosts }}
+    {{- $servicePort := required "ingress.hosts[].servicePort is required" .servicePort }}
+    - host: {{ required "ingress.hosts[].host is required" .host | quote }}
+      http:
+        paths:
+          - path: {{ default "/" .path | quote }}
+            pathType: {{ default "Prefix" .pathType }}
+            backend:
+              service:
+                name: {{ required "ingress.hosts[].serviceName is required" .serviceName }}
+                port:
+                  {{- if and (kindIs "string" $servicePort) (not (regexMatch "^[0-9]+$" (toString $servicePort))) }}
+                  name: {{ toString $servicePort | quote }}
+                  {{- else }}
+                  number: {{ int $servicePort }}
+                  {{- end }}
+    {{- end }}
+{{- end }}

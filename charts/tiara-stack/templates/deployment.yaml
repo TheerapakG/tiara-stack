@@ -1,0 +1,195 @@
+{{- $root := . -}}
+{{- range $svc := include "tiara-stack.serviceSpecs" . | fromYamlArray }}
+{{- $serviceValues := (index ($root.Values.services | default dict) $svc.key) | default dict -}}
+{{- $secretRef := $serviceValues.secretRef | default dict -}}
+{{- if $serviceValues.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $svc.name }}
+  labels:
+    {{- include "tiara-stack.labels" $root | nindent 4 }}
+    app: {{ $svc.name }}
+spec:
+  replicas: {{ if hasKey $serviceValues "replicas" }}{{ $serviceValues.replicas }}{{ else }}1{{ end }}
+  selector:
+    matchLabels:
+      {{- include "tiara-stack.selectorLabels" (dict "root" $root "name" $svc.name) | nindent 6 }}
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: {{ if hasKey $svc "maxUnavailable" }}{{ $svc.maxUnavailable }}{{ else if eq (int (default 1 $serviceValues.replicas)) 1 }}0{{ else }}1{{ end }}
+  minReadySeconds: 5
+  template:
+    metadata:
+      annotations:
+        checksum/env-overrides: {{ toYaml ($serviceValues.env | default dict) | sha256sum }}
+        checksum/ca: {{ printf "%s:%s" $root.Values.global.caCertificate.key $root.Values.global.caCertificate.value | sha256sum }}
+        reloader.stakater.com/auto: "true"
+      labels:
+        {{- include "tiara-stack.labels" $root | nindent 8 }}
+        app: {{ $svc.name }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccountName: {{ if eq $svc.key "sheetCluster" }}{{ include "tiara-stack.sheetClusterName" $root }}{{ else }}{{ $svc.name }}{{ end }}
+      automountServiceAccountToken: {{ if or (eq $svc.name "sheet-auth") (eq $svc.key "sheetCluster") }}true{{ else }}false{{ end }}
+      {{- if eq $svc.name "sheet-ingress-server" }}
+      terminationGracePeriodSeconds: 30
+      {{- end }}
+      containers:
+        - name: {{ $svc.name }}
+          image: {{ include "tiara-stack.image" (dict "root" $root "name" $svc.name "image" $serviceValues.image) | quote }}
+          imagePullPolicy: {{ include "tiara-stack.imagePullPolicy" (dict "root" $root "image" $serviceValues.image) }}
+          resources:
+            {{- if hasKey $serviceValues "resources" }}
+            {{- toYaml $serviceValues.resources | nindent 12 }}
+            {{- else }}
+            {{- toYaml $root.Values.global.defaultResources | nindent 12 }}
+            {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+          ports:
+            {{- range $port := $svc.containerPorts }}
+            - containerPort: {{ $port.containerPort }}
+              name: {{ $port.name }}
+            {{- end }}
+          {{- if eq $svc.name "sheet-ingress-server" }}
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 10"]
+          {{- end }}
+          env:
+            {{- $envOverrides := $serviceValues.env | default dict }}
+            {{- range $env := $svc.env }}
+            {{- if and (hasKey $envOverrides $env.name) (not (hasKey $env "value")) }}
+            {{- fail (printf "services.%s.env cannot override %s because it is generated from valueFrom" $svc.key $env.name) }}
+            {{- end }}
+            {{- if not (hasKey $envOverrides $env.name) }}
+            - name: {{ $env.name }}
+              {{- if hasKey $env "value" }}
+              value: {{ $env.value | quote }}
+              {{- else if $env.fieldPath }}
+              valueFrom:
+                fieldRef:
+                  fieldPath: {{ $env.fieldPath }}
+              {{- else if $env.secretKey }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ default $svc.secretName $secretRef.name }}
+                  key: {{ $env.secretKey }}
+                  {{- if $env.optional }}
+                  optional: true
+                  {{- end }}
+              {{- end }}
+            {{- end }}
+            {{- end }}
+            {{- range $name, $value := $envOverrides }}
+            - name: {{ $name }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- if and $svc.googleServiceAccount (not (hasKey $envOverrides "GOOGLE_APPLICATION_CREDENTIALS")) }}
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: /.secret/google-service-account.json
+            {{- end }}
+            {{- if $root.Values.global.caCertificate.enabled }}
+            {{- if not (hasKey $envOverrides "NODE_EXTRA_CA_CERTS") }}
+            - name: NODE_EXTRA_CA_CERTS
+              value: /usr/local/share/ca-certificates/tiarastack/tiarastack.crt
+            {{- end }}
+            {{- if not (hasKey $envOverrides "SSL_CERT_FILE") }}
+            - name: SSL_CERT_FILE
+              value: /usr/local/share/ca-certificates/tiarastack/tiarastack.crt
+            {{- end }}
+            {{- if not (hasKey $envOverrides "REQUESTS_CA_BUNDLE") }}
+            - name: REQUESTS_CA_BUNDLE
+              value: /usr/local/share/ca-certificates/tiarastack/tiarastack.crt
+            {{- end }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: {{ $svc.portName }}
+              scheme: HTTP
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: {{ $svc.portName }}
+              scheme: HTTP
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /live
+              port: {{ $svc.portName }}
+              scheme: HTTP
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 12
+          volumeMounts:
+            {{- if $svc.googleServiceAccount }}
+            - name: {{ $svc.name }}-secret-path
+              readOnly: true
+              mountPath: "/.secret"
+            {{- end }}
+            {{- if $svc.projectedTokens }}
+            - name: {{ $svc.name }}-tokens
+              readOnly: true
+              mountPath: "/var/run/secrets/tokens"
+            {{- end }}
+            {{- if $root.Values.global.caCertificate.enabled }}
+            - name: {{ $svc.name }}-ca-certificate
+              readOnly: true
+              mountPath: "/usr/local/share/ca-certificates/tiarastack"
+            {{- end }}
+            - name: {{ $svc.name }}-tmp
+              mountPath: "/tmp"
+      volumes:
+        {{- if $svc.googleServiceAccount }}
+        - name: {{ $svc.name }}-secret-path
+          secret:
+            secretName: {{ required (printf "services.%s.googleServiceAccountSecretRef.name is required when %s is enabled" $svc.key $svc.name) (dig "googleServiceAccountSecretRef" "name" "" $serviceValues) }}
+            items:
+              - key: {{ required (printf "services.%s.googleServiceAccountSecretRef.key is required when %s is enabled" $svc.key $svc.name) (dig "googleServiceAccountSecretRef" "key" "" $serviceValues) }}
+                path: google-service-account.json
+        {{- end }}
+        {{- if $svc.projectedTokens }}
+        - name: {{ $svc.name }}-tokens
+          projected:
+            sources:
+              {{- range $token := $svc.projectedTokens }}
+              - serviceAccountToken:
+                  path: {{ $token.path }}
+                  expirationSeconds: 3600
+                  audience: {{ $token.audience }}
+              {{- end }}
+        {{- end }}
+        {{- if $root.Values.global.caCertificate.enabled }}
+        - name: {{ $svc.name }}-ca-certificate
+          configMap:
+            name: {{ include "tiara-stack.caConfigMapName" (dict "root" $root) }}
+            items:
+              - key: {{ $root.Values.global.caCertificate.key }}
+                path: tiarastack.crt
+        {{- end }}
+        - name: {{ $svc.name }}-tmp
+          emptyDir: {}
+{{- end }}
+{{- end }}

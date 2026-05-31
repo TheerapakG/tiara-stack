@@ -22,6 +22,7 @@ catalog:
     "@types/node": ^24.7.2,
     dfx: npm:dfx@1.0.13,
     effect: npm:effect@4.0.0-beta.67,
+    tsx: npm:tsx@4.22.3,
     vite: npm:@voidzero-dev/vite-plus-core@0.1.15,
     vitest: npm:@voidzero-dev/vite-plus-test@0.1.15,
     vite-plus: 0.1.15,

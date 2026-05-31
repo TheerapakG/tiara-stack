@@ -1,0 +1,110 @@
+{{- if .Values.networkPolicies.enabled }}
+{{- $root := . -}}
+{{- range $svc := include "tiara-stack.serviceSpecs" . | fromYamlArray }}
+{{- $serviceValues := (index ($root.Values.services | default dict) $svc.key) | default dict -}}
+{{- $metricsIngressEnabled := and $root.Values.monitoring.serviceMonitor.enabled (dig "serviceMonitor" "enabled" false $serviceValues) -}}
+{{- if and $serviceValues.enabled (or $svc.networkPolicyFrom $svc.networkPolicySelf $metricsIngressEnabled) }}
+{{- if $svc.networkPolicyFrom }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $svc.name }}-service-ingress
+  labels:
+    {{- include "tiara-stack.labels" $root | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "tiara-stack.selectorLabels" (dict "root" $root "name" $svc.name) | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    {{- range $rule := $svc.networkPolicyFrom }}
+    - from:
+        - podSelector:
+            matchLabels:
+              app: {{ $rule.app }}
+              app.kubernetes.io/instance: {{ $root.Release.Name }}
+      ports:
+        - protocol: TCP
+          port: {{ $rule.port }}
+    {{- end }}
+    {{- include "tiara-stack.metricsIngressRule" (dict "root" $root "serviceValues" $serviceValues "svc" $svc) | nindent 4 }}
+{{- end }}
+{{- if $svc.networkPolicySelf }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $svc.name }}-cluster-rpc
+  labels:
+    {{- include "tiara-stack.labels" $root | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "tiara-stack.selectorLabels" (dict "root" $root "name" $svc.name) | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: {{ $svc.name }}
+              app.kubernetes.io/instance: {{ $root.Release.Name }}
+      ports:
+        {{- range $rule := $svc.networkPolicySelf }}
+        - protocol: TCP
+          port: {{ $rule.port }}
+        {{- end }}
+    {{- include "tiara-stack.metricsIngressRule" (dict "root" $root "serviceValues" $serviceValues "svc" $svc) | nindent 4 }}
+{{- end }}
+{{- if and $metricsIngressEnabled (not $svc.networkPolicyFrom) (not $svc.networkPolicySelf) }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $svc.name }}-metrics-ingress
+  labels:
+    {{- include "tiara-stack.labels" $root | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "tiara-stack.selectorLabels" (dict "root" $root "name" $svc.name) | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    {{- include "tiara-stack.metricsIngressRule" (dict "root" $root "serviceValues" $serviceValues "svc" $svc) | nindent 4 }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- if and .Values.networkPolicies.enabled .Values.zeroCache.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "tiara-stack.zeroCacheName" . }}-service-ingress
+  labels:
+    {{- include "tiara-stack.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ include "tiara-stack.zeroCacheName" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  policyTypes:
+    - Ingress
+  ingress:
+    # These peers are intentionally ORed: sheet-apis calls Zero internally,
+    # while the ingress controller serves the public Zero endpoint.
+    - from:
+        - podSelector:
+            matchLabels:
+              app: {{ include "tiara-stack.sheetApisName" . }}
+              app.kubernetes.io/instance: {{ .Release.Name }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.ingress.controllerNamespace }}
+      ports:
+        - protocol: TCP
+          port: zero-cache-svc
+{{- end }}
+{{- end }}

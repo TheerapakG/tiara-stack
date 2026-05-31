@@ -1,0 +1,234 @@
+global:
+  imagePullSecrets: []
+  appImage:
+    registry: ""
+    tag: ""
+    pullPolicy: IfNotPresent
+  defaultResources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  caCertificate:
+    enabled: false
+    existingConfigMap: ""
+    key: ca-certificate.crt
+    value: ""
+secrets:
+  create: false
+
+infisical:
+  enabled: false
+  projectId: ""
+  environmentSlug: prod
+  secretPathPrefix: /tiara-stack
+  refreshInterval: 60s
+  instantUpdates: false
+  connection:
+    create: true
+    name: tiara-stack-infisical
+    # Empty string defaults to .Release.Namespace.
+    namespace: ""
+    address: ""
+  auth:
+    create: true
+    name: tiara-stack-infisical
+    # Empty string defaults to .Release.Namespace.
+    namespace: ""
+    method: kubernetes
+    kubernetes:
+      identityIdSecretRef:
+        name: tiara-stack-infisical-identity
+        # Empty string defaults to .Release.Namespace.
+        namespace: ""
+        key: identityId
+      serviceAccount:
+        create: true
+        name: tiara-stack-infisical-auth
+        # Empty string defaults to .Release.Namespace.
+        namespace: ""
+      serviceAccountTokenAudiences:
+        - infisical
+    universal:
+      credentialsSecretRef:
+        name: tiara-stack-infisical-universal-auth
+        # Empty string defaults to .Release.Namespace.
+        namespace: ""
+        clientIdKey: clientId
+        clientSecretKey: clientSecret
+  managedSecrets:
+    # Requires infisical.auth.name to reference an InfisicalAuth resource.
+    create: true
+    creationPolicy: Orphan
+
+ingress:
+  enabled: false
+  name: ""
+  className: nginx
+  controllerNamespace: ingress-nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  tls: []
+  hosts: []
+
+services:
+  sheetAuth:
+    enabled: true
+    image:
+      repository: ""
+      tag: ""
+      pullPolicy: ""
+    replicas: 1
+    secretRef:
+      name: sheet-auth-secret
+    env: {}
+    serviceMonitor:
+      enabled: true
+
+  sheetApis:
+    enabled: true
+    image:
+      repository: ""
+      tag: ""
+      pullPolicy: ""
+    replicas: 1
+    secretRef:
+      name: sheet-apis-secret
+    googleServiceAccountSecretRef:
+      name: sheet-apis-secret-path
+      key: google-service-account.json
+    env: {}
+    serviceMonitor:
+      enabled: true
+
+  sheetBot:
+    enabled: true
+    image:
+      repository: ""
+      tag: ""
+      pullPolicy: ""
+    replicas: 1
+    secretRef:
+      name: sheet-bot-secret
+    env: {}
+    serviceMonitor:
+      enabled: true
+
+  sheetCluster:
+    enabled: true
+    image:
+      repository: ""
+      tag: ""
+      pullPolicy: ""
+    replicas: 1
+    secretRef:
+      name: sheet-cluster-secret
+    env: {}
+    serviceMonitor:
+      enabled: true
+
+  sheetDbServer:
+    enabled: true
+    image:
+      repository: ""
+      tag: ""
+      pullPolicy: ""
+    replicas: 1
+    secretRef:
+      name: sdbs-secret
+    env: {}
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: "1"
+        memory: 1Gi
+    serviceMonitor:
+      enabled: true
+
+  sheetIngressServer:
+    enabled: true
+    image:
+      repository: ""
+      tag: ""
+      pullPolicy: ""
+    replicas: 1
+    secretRef:
+      name: sheet-ingress-server-secret
+    env: {}
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: "1"
+        memory: 1Gi
+    serviceMonitor:
+      enabled: true
+
+  sheetWeb:
+    enabled: true
+    image:
+      repository: ""
+      tag: ""
+      pullPolicy: ""
+    replicas: 1
+    secretRef:
+      name: sheet-web-secret
+    env: {}
+    serviceMonitor:
+      enabled: false
+
+zeroCache:
+  enabled: true
+  replicas: 1
+  nameOverride: ""
+  serviceNameOverride: ""
+  image:
+    repository: rocicorp/zero
+    tag: "1.5.0"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  envoy:
+    configMapNameOverride: ""
+    tokenRefreshIntervalSeconds: 300
+    image:
+      repository: envoyproxy/envoy
+      tag: "v1.38.0"
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+  secretRef:
+    name: zero-secret
+  persistence:
+    enabled: true
+    # ZERO_REPLICA_FILE must point under a writable mount such as /data.
+    storageClassName: ""
+    size: 5Gi
+    existingVolumeName: ""
+
+monitoring:
+  prometheusNamespace: monitoring
+  serviceMonitor:
+    enabled: true
+    releaseLabel: kube-prometheus-stack
+
+networkPolicies:
+  enabled: true
+
+pdb:
+  maxUnavailable: 1

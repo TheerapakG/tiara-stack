@@ -1,0 +1,148 @@
+{{- if .Values.infisical.enabled }}
+{{- $root := . -}}
+{{- $infisicalNamespace := default .Release.Namespace .Values.infisical.connection.namespace -}}
+{{- $authNamespace := default .Release.Namespace .Values.infisical.auth.namespace -}}
+{{- $secretPathPrefix := trimSuffix "/" .Values.infisical.secretPathPrefix -}}
+{{- if and .Values.infisical.auth.create (not .Values.infisical.auth.name) -}}
+{{- fail "infisical.auth.name is required when infisical.auth.create=true" -}}
+{{- end -}}
+{{- if and .Values.infisical.managedSecrets.create (not .Values.infisical.auth.name) -}}
+{{- fail "infisical.auth.name is required when infisical.managedSecrets.create=true" -}}
+{{- end -}}
+{{- if and .Values.infisical.auth.create (not .Values.infisical.connection.create) (not .Values.infisical.connection.name) -}}
+{{- fail "infisical.connection.name is required when infisical.auth.create=true and infisical.connection.create=false" -}}
+{{- end -}}
+{{- if and .Values.infisical.connection.create (not .Values.infisical.connection.name) -}}
+{{- fail "infisical.connection.name is required when infisical.connection.create=true" -}}
+{{- end -}}
+{{- if .Values.infisical.connection.create }}
+---
+apiVersion: secrets.infisical.com/v1beta1
+kind: InfisicalConnection
+metadata:
+  name: {{ required "infisical.connection.name is required when infisical.connection.create=true" .Values.infisical.connection.name }}
+  namespace: {{ $infisicalNamespace }}
+  labels:
+    {{- include "tiara-stack.labels" . | nindent 4 }}
+spec:
+  address: {{ required "infisical.connection.address is required when infisical.enabled=true and infisical.connection.create=true" .Values.infisical.connection.address | quote }}
+{{- end }}{{ printf "\n" -}}
+{{- if and .Values.infisical.auth.create (eq .Values.infisical.auth.method "kubernetes") .Values.infisical.auth.kubernetes.serviceAccount.create }}
+{{- $serviceAccountNamespace := default .Release.Namespace .Values.infisical.auth.kubernetes.serviceAccount.namespace -}}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ required "infisical.auth.kubernetes.serviceAccount.name is required" .Values.infisical.auth.kubernetes.serviceAccount.name }}
+  namespace: {{ $serviceAccountNamespace }}
+  labels:
+    {{- include "tiara-stack.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ printf "%s-%s-%s-auth-delegator" .Release.Name .Release.Namespace .Values.infisical.auth.kubernetes.serviceAccount.name | trunc 63 | trimSuffix "-" }}
+  labels:
+    {{- include "tiara-stack.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.infisical.auth.kubernetes.serviceAccount.name }}
+    namespace: {{ $serviceAccountNamespace }}
+{{- end }}{{ printf "\n" -}}
+{{- if .Values.infisical.auth.create }}
+---
+apiVersion: secrets.infisical.com/v1beta1
+kind: InfisicalAuth
+metadata:
+  name: {{ required "infisical.auth.name is required when infisical.auth.create=true" .Values.infisical.auth.name }}
+  namespace: {{ $authNamespace }}
+  labels:
+    {{- include "tiara-stack.labels" . | nindent 4 }}
+spec:
+  infisicalConnectionRef:
+    name: {{ .Values.infisical.connection.name }}
+    namespace: {{ $infisicalNamespace }}
+  method: {{ .Values.infisical.auth.method }}
+  {{- if eq .Values.infisical.auth.method "kubernetes" }}
+  kubernetes:
+    identityIdRef:
+      name: {{ .Values.infisical.auth.kubernetes.identityIdSecretRef.name }}
+      namespace: {{ default .Release.Namespace .Values.infisical.auth.kubernetes.identityIdSecretRef.namespace }}
+      key: {{ .Values.infisical.auth.kubernetes.identityIdSecretRef.key }}
+    serviceAccountRef:
+      name: {{ .Values.infisical.auth.kubernetes.serviceAccount.name }}
+      namespace: {{ default .Release.Namespace .Values.infisical.auth.kubernetes.serviceAccount.namespace }}
+    {{- with .Values.infisical.auth.kubernetes.serviceAccountTokenAudiences }}
+    serviceAccountTokenAudiences:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  {{- else if eq .Values.infisical.auth.method "universal" }}
+  universal:
+    clientIdRef:
+      name: {{ .Values.infisical.auth.universal.credentialsSecretRef.name }}
+      namespace: {{ default .Release.Namespace .Values.infisical.auth.universal.credentialsSecretRef.namespace }}
+      key: {{ .Values.infisical.auth.universal.credentialsSecretRef.clientIdKey }}
+    clientSecretRef:
+      name: {{ .Values.infisical.auth.universal.credentialsSecretRef.name }}
+      namespace: {{ default .Release.Namespace .Values.infisical.auth.universal.credentialsSecretRef.namespace }}
+      key: {{ .Values.infisical.auth.universal.credentialsSecretRef.clientSecretKey }}
+  {{- else }}
+  {{- fail "infisical.auth.method must be one of: kubernetes, universal" }}
+  {{- end }}
+{{- end }}{{ printf "\n" -}}
+{{- if .Values.infisical.managedSecrets.create }}
+{{- $projectId := required "infisical.projectId is required when infisical.managedSecrets.create=true" .Values.infisical.projectId -}}
+{{- $allowedCreationPolicies := dict "Owner" true "Orphan" true "Merge" true "None" true -}}
+{{- if not (hasKey $allowedCreationPolicies .Values.infisical.managedSecrets.creationPolicy) -}}
+{{- fail "infisical.managedSecrets.creationPolicy must be one of: Owner, Orphan, Merge, None" -}}
+{{- end -}}
+{{- $seenSecrets := dict -}}
+{{- $secretNames := list -}}
+{{- range $svc := include "tiara-stack.serviceSpecs" . | fromYamlArray -}}
+{{- $svcValues := (index ($root.Values.services | default dict) $svc.key) | default dict -}}
+{{- $secretRef := $svcValues.secretRef | default dict -}}
+{{- if $svcValues.enabled }}{{- $secretNames = append $secretNames (default (include "tiara-stack.defaultSecretName" $svc.key) $secretRef.name) -}}{{- end -}}
+{{- end -}}
+{{- $sheetApisValues := .Values.services.sheetApis | default dict -}}
+{{- $sheetApisGoogleSecretRef := $sheetApisValues.googleServiceAccountSecretRef | default dict -}}
+{{- if $sheetApisValues.enabled }}{{- $secretNames = append $secretNames (default (include "tiara-stack.defaultSecretName" "sheetApisGoogleServiceAccount") $sheetApisGoogleSecretRef.name) -}}{{- end -}}
+{{- $zeroCacheSecretRef := .Values.zeroCache.secretRef | default dict -}}
+{{- if .Values.zeroCache.enabled }}{{- $secretNames = append $secretNames (default (include "tiara-stack.defaultSecretName" "zeroCache") $zeroCacheSecretRef.name) -}}{{- end -}}
+{{- if eq (len $secretNames) 0 -}}
+{{- fail ".Values.infisical.managedSecrets.create=true requires at least one enabled service or zeroCache entry to generate InfisicalStaticSecret resources" -}}
+{{- end -}}
+{{- range $secretName := $secretNames }}
+{{- if not (hasKey $seenSecrets $secretName) }}
+{{- $_ := set $seenSecrets $secretName true }}
+---
+apiVersion: secrets.infisical.com/v1beta1
+kind: InfisicalStaticSecret
+metadata:
+  name: {{ printf "%s-sync" $secretName | trunc 63 | trimSuffix "-" }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "tiara-stack.labels" $root | nindent 4 }}
+spec:
+  infisicalAuthRef:
+    name: {{ $root.Values.infisical.auth.name }}
+    namespace: {{ $authNamespace }}
+  syncOptions:
+    refreshInterval: {{ $root.Values.infisical.refreshInterval | quote }}
+    instantUpdates: {{ default false $root.Values.infisical.instantUpdates }}
+  sources:
+    - projectId: {{ $projectId | quote }}
+      environmentSlug: {{ $root.Values.infisical.environmentSlug | quote }}
+      secretPath: {{ printf "%s/%s" $secretPathPrefix $secretName | quote }}
+  targets:
+    - name: {{ $secretName }}
+      namespace: {{ $root.Release.Namespace }}
+      kind: Secret
+      creationPolicy: {{ $root.Values.infisical.managedSecrets.creationPolicy }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

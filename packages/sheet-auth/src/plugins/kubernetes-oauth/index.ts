@@ -1,5 +1,5 @@
 import { createRemoteJWKSet, customFetch, jwtVerify } from "jose";
-import { readFileSync } from "fs";
+import { readFile } from "fs/promises";
 import {
   BASE_ERROR_CODES,
   type BetterAuthPlugin,
@@ -8,7 +8,7 @@ import {
   type User,
 } from "better-auth";
 import { createAuthEndpoint, type AuthEndpoint, type AuthMiddleware } from "better-auth/plugins";
-import { Schema } from "effect";
+import { Effect, Option, Schema, SchemaGetter, SchemaIssue } from "effect";
 import { APIError } from "better-auth";
 import { setSessionCookie } from "better-auth/cookies";
 import { sessionMiddleware } from "better-auth/api";
@@ -18,45 +18,123 @@ const KUBERNETES_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/tok
 const KUBERNETES_JWKS_URL = "https://kubernetes.default.svc.cluster.local/openid/v1/jwks";
 export const DISCORD_SERVICE_USER_ID_SENTINEL = "service_user";
 
-function readKubernetesToken(): string {
+const ServiceAccountJwksUrl = Schema.String.pipe(
+  Schema.decodeTo(Schema.String, {
+    decode: SchemaGetter.transformOrFail((url) =>
+      URL.canParse(url)
+        ? Effect.succeed(url)
+        : Effect.fail(new SchemaIssue.InvalidValue(Option.some(url))),
+    ),
+    encode: SchemaGetter.passthrough(),
+  }),
+);
+const ServiceAccountEnv = Schema.Struct({
+  SERVICE_ACCOUNT_TOKEN_PATH: Schema.optional(Schema.String),
+  SERVICE_ACCOUNT_JWKS_URL: Schema.optional(Schema.String),
+  SERVICE_ACCOUNT_JWKS_AUTH_TOKEN_PATH: Schema.optional(Schema.String),
+  SERVICE_ACCOUNT_JWT_ISSUER: Schema.optional(Schema.String),
+});
+type ServiceAccountConfig = {
+  readonly jwksAuthTokenPath: string;
+  readonly jwksUrl: string;
+  readonly issuer: string | undefined;
+};
+
+/**
+ * SERVICE_ACCOUNT_JWKS_AUTH_TOKEN_PATH has three states:
+ * undefined uses the service account token, "" disables the Authorization
+ * header for external JWKS endpoints, and any other value is a custom path.
+ */
+let serviceAccountConfig: ServiceAccountConfig | undefined;
+function getServiceAccountConfig() {
+  if (serviceAccountConfig) return serviceAccountConfig;
   try {
-    return readFileSync(KUBERNETES_TOKEN_PATH, "utf-8");
+    const env = Schema.decodeUnknownSync(ServiceAccountEnv)(process.env);
+    const tokenPath = env.SERVICE_ACCOUNT_TOKEN_PATH?.trim() || KUBERNETES_TOKEN_PATH;
+    const jwksUrl = Schema.decodeUnknownSync(ServiceAccountJwksUrl)(
+      env.SERVICE_ACCOUNT_JWKS_URL?.trim() || KUBERNETES_JWKS_URL,
+    );
+    const jwksAuthTokenPath = normalizeJwksAuthTokenPath(
+      tokenPath,
+      env.SERVICE_ACCOUNT_JWKS_AUTH_TOKEN_PATH,
+    );
+    const issuer = env.SERVICE_ACCOUNT_JWT_ISSUER?.trim() || undefined;
+
+    serviceAccountConfig = {
+      jwksAuthTokenPath,
+      jwksUrl,
+      issuer,
+    };
+    return serviceAccountConfig;
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : String(cause);
+    throw new Error(`Invalid SERVICE_ACCOUNT_* env: ${message}`, { cause });
+  }
+}
+
+function normalizeJwksAuthTokenPath(tokenPath: string, rawJwksAuthTokenPath: string | undefined) {
+  if (rawJwksAuthTokenPath === undefined) return tokenPath;
+  const trimmed = rawJwksAuthTokenPath.trim();
+  if (trimmed === "" && rawJwksAuthTokenPath !== "") {
+    console.warn(
+      "SERVICE_ACCOUNT_JWKS_AUTH_TOKEN_PATH contains only whitespace; falling back to SERVICE_ACCOUNT_TOKEN_PATH.",
+    );
+    return tokenPath;
+  }
+  return trimmed;
+}
+
+let issuerWarningLogged = false;
+
+async function readServiceAccountToken(tokenPath: string): Promise<string> {
+  try {
+    return (await readFile(tokenPath, "utf-8")).trim();
   } catch (cause) {
     throw new Error(
-      `Failed to read Kubernetes service account token from ${KUBERNETES_TOKEN_PATH}. ` +
-        `Ensure the pod is running in Kubernetes with a mounted service account.`,
+      `Failed to read service account token from ${tokenPath}. ` +
+        `Ensure the workload has a mounted service account token.`,
       { cause },
     );
   }
 }
 
-// Cached JWKS instance to avoid reading K8s token on every verification
-const jwksCache = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
+// Cached JWKS instance to avoid reading K8s token on every verification.
+let jwksInstance: ReturnType<typeof createRemoteJWKSet> | undefined;
 
-function getJWKS(expectedAudience: string) {
-  const cached = jwksCache.get(expectedAudience);
-  if (cached) return cached;
+function getJWKS() {
+  if (jwksInstance) return jwksInstance;
+  const { jwksUrl, jwksAuthTokenPath } = getServiceAccountConfig();
 
-  const jwks = createRemoteJWKSet(new URL(KUBERNETES_JWKS_URL), {
-    [customFetch]: (input: RequestInfo | URL, init?: RequestInit) =>
-      fetch(input, {
-        ...init,
-        headers: {
-          // eslint-disable-next-line @typescript-eslint/no-misused-spread
-          ...init?.headers,
-          Authorization: `Bearer ${readKubernetesToken()}`,
+  jwksInstance = createRemoteJWKSet(
+    new URL(jwksUrl),
+    jwksAuthTokenPath === ""
+      ? undefined
+      : {
+          [customFetch]: async (input: RequestInfo | URL, init?: RequestInit) => {
+            const headers = new Headers(init?.headers);
+            headers.set(
+              "Authorization",
+              `Bearer ${await readServiceAccountToken(jwksAuthTokenPath)}`,
+            );
+            return fetch(input, {
+              ...init,
+              headers,
+            });
+          },
         },
-      }),
-  });
-
-  jwksCache.set(expectedAudience, jwks);
-  return jwks;
+  );
+  return jwksInstance;
 }
 
 /**
  * Verify Kubernetes projected ServiceAccount token
  *
- * Validates the token signature, issuer, and audience.
+ * Validates the token signature and audience. Issuer validation is optional:
+ * when SERVICE_ACCOUNT_JWT_ISSUER is unset, jwtVerify receives issuer:
+ * undefined and skips issuer validation. Set SERVICE_ACCOUNT_JWT_ISSUER in
+ * non-Kubernetes environments that use a custom JWKS, or enforce equivalent
+ * issuer checks at the trust boundary.
+ *
  * Note: This only validates the K8s token structure. The discord_user_id
  * should be provided separately in the request body.
  */
@@ -64,10 +142,16 @@ export async function verifyKubernetesToken(
   token: string,
   expectedAudience: string,
 ): Promise<{ exp: number | undefined; sub: string }> {
-  const jwks = getJWKS(expectedAudience);
+  const jwks = getJWKS();
+  const { issuer } = getServiceAccountConfig();
+  if (!issuer && !issuerWarningLogged) {
+    issuerWarningLogged = true;
+    console.warn("SERVICE_ACCOUNT_JWT_ISSUER is unset; JWT issuer validation is disabled.");
+  }
 
   const { payload } = await jwtVerify(token, jwks, {
     audience: expectedAudience,
+    issuer,
   });
 
   // Validate that this is a ServiceAccount token

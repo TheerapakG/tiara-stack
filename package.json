@@ -9,9 +9,14 @@
     "checks": "pnpm format && pnpm lint && pnpm test",
     "format:apply": "vp run -r format:apply",
     "build": "vp run -r build",
+    "compose:generate-secrets": "tsx deploy/compose/scripts/generate-secrets.ts --no-overwrite",
+    "compose:migrate-sheet-db": "tsx deploy/compose/scripts/migrate-sheet-db.ts",
     "prepare": "vp config"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
+    "effect": "catalog:",
+    "tsx": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"
   },

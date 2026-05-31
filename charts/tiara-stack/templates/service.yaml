@@ -1,0 +1,48 @@
+{{- $root := . -}}
+{{- range $svc := include "tiara-stack.serviceSpecs" . | fromYamlArray }}
+{{- $serviceValues := (index ($root.Values.services | default dict) $svc.key) | default dict -}}
+{{- if $serviceValues.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ default (printf "%s-service" $svc.name) $serviceValues.serviceNameOverride }}
+  labels:
+    {{- include "tiara-stack.labels" $root | nindent 4 }}
+    app: {{ $svc.name }}
+spec:
+  ports:
+    {{- range $port := $svc.servicePorts }}
+    - name: {{ $port.name }}
+      protocol: TCP
+      port: {{ $port.port }}
+      targetPort: {{ $port.targetPort }}
+    {{- end }}
+  selector:
+    {{- include "tiara-stack.selectorLabels" (dict "root" $root "name" $svc.name) | nindent 4 }}
+{{- range $extra := $svc.extraServices }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $extra.name }}
+  labels:
+    {{- include "tiara-stack.labels" $root | nindent 4 }}
+    app: {{ $svc.name }}
+spec:
+  {{- if $extra.headless }}
+  clusterIP: None
+  publishNotReadyAddresses: true
+  {{- end }}
+  ports:
+    {{- range $port := $extra.ports }}
+    - name: {{ $port.name }}
+      protocol: TCP
+      port: {{ $port.port }}
+      targetPort: {{ $port.targetPort }}
+    {{- end }}
+  selector:
+    {{- include "tiara-stack.selectorLabels" (dict "root" $root "name" $svc.name) | nindent 4 }}
+{{- end }}
+{{- end }}
+{{- end }}
