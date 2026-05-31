@@ -86,6 +86,9 @@ describe("SheetClusterForwardingClient", () => {
       [DispatchWorkflowOperations.serviceStatus.discardRpcTag]: makeDiscard(
         DispatchWorkflowOperations.serviceStatus,
       ),
+      [DispatchWorkflowOperations.guildWelcome.discardRpcTag]: makeDiscard(
+        DispatchWorkflowOperations.guildWelcome,
+      ),
       [DispatchWorkflowOperations.slotOpenButton.discardRpcTag]: makeDiscard(
         DispatchWorkflowOperations.slotOpenButton,
       ),
@@ -290,6 +293,30 @@ describe("SheetClusterForwardingClient", () => {
         dispatchRequestId: "dispatch-service-status",
         interactionToken: "token-1",
         interactionDeadlineEpochMs: expect.any(Number),
+      },
+    });
+    await expect(
+      Effect.runPromise(
+        client.dispatch.guildWelcome({
+          requester,
+          payload: {
+            dispatchRequestId: "dispatch-guild-welcome",
+            guildId: "guild-1",
+            guildName: "Guild One",
+            joinedAt: "2026-05-31T00:00:00.000Z",
+            systemChannelId: "channel-1",
+          },
+        } as never) as Effect.Effect<unknown, unknown, never>,
+      ),
+    ).resolves.toMatchObject({ operation: "guildWelcome" });
+    expectDiscarded(DispatchWorkflowOperations.guildWelcome, {
+      requester,
+      payload: {
+        dispatchRequestId: "dispatch-guild-welcome",
+        guildId: "guild-1",
+        guildName: "Guild One",
+        joinedAt: "2026-05-31T00:00:00.000Z",
+        systemChannelId: "channel-1",
       },
     });
 

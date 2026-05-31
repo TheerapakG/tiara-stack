@@ -58,6 +58,9 @@ export class SheetClusterForwardingClient extends Context.Service<SheetClusterFo
           serviceStatus: accept(DispatchWorkflowOperations.serviceStatus, (args) =>
             rpcClient[DispatchWorkflowOperations.serviceStatus.discardRpcTag](args),
           ),
+          guildWelcome: accept(DispatchWorkflowOperations.guildWelcome, (args) =>
+            rpcClient[DispatchWorkflowOperations.guildWelcome.discardRpcTag](args),
+          ),
           [DispatchWorkflowOperations.roomOrderPreviousButton.endpointName]: accept(
             DispatchWorkflowOperations.roomOrderPreviousButton,
             (args) =>

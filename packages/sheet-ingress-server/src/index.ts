@@ -734,6 +734,7 @@ const makeApiLayer = () => {
           ),
         )
         .handle("serviceStatus", authorizedSheetClusterDispatch("serviceStatus", requireNonService))
+        .handle("guildWelcome", authorizedSheetClusterDispatch("guildWelcome", requireService))
         .handle(
           DispatchRoomOrderButtonMethods.previous.endpointName,
           authorizedSheetClusterDispatch(
