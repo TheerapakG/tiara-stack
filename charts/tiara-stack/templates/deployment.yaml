@@ -181,7 +181,9 @@ spec:
               - serviceAccountToken:
                   path: {{ $token.path }}
                   expirationSeconds: 3600
+                  {{- if hasKey $token "audience" }}
                   audience: {{ $token.audience }}
+                  {{- end }}
               {{- end }}
         {{- end }}
         - name: {{ $svc.name }}-kube-root-ca

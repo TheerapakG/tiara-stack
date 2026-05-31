@@ -280,6 +280,7 @@ export const DispatchAcceptedResult = Schema.Struct({
     "slotList",
     "slotOpenButton",
     "serviceStatus",
+    "guildWelcome",
     "checkinButton",
     "roomOrderPreviousButton",
     "roomOrderNextButton",

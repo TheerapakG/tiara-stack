@@ -170,6 +170,19 @@ imagePullSecrets:
       value: "auth:"
     - name: TRUSTED_ORIGINS
       secretKey: trustedOrigins
+    - name: SERVICE_ACCOUNT_JWKS_AUTH_TOKEN_PATH
+      value: /var/run/secrets/tokens/kubernetes-jwks-token
+  projectedTokens:
+    - path: kubernetes-jwks-token
+  networkPolicyFrom:
+    - app: sheet-apis
+      port: sheet-auth-svc
+    - app: sheet-bot
+      port: sheet-auth-svc
+    - app: sheet-cluster
+      port: sheet-auth-svc
+    - app: sheet-ingress-server
+      port: sheet-auth-svc
 - key: sheetApis
   name: sheet-apis
   portName: sheet-apis-svc
@@ -208,7 +221,10 @@ imagePullSecrets:
       value: sheet-apis
     - name: SHEET_INGRESS_BASE_URL
       secretKey: sheetIngressBaseUrl
+    - name: SERVICE_ACCOUNT_JWKS_AUTH_TOKEN_PATH
+      value: /var/run/secrets/tokens/kubernetes-jwks-token
   projectedTokens:
+    - path: kubernetes-jwks-token
     - path: zero-cache-token
       audience: zero-cache
     - path: sheet-auth-token
@@ -251,7 +267,10 @@ imagePullSecrets:
       secretKey: sheetAuthIssuer
     - name: SHEET_INGRESS_KUBERNETES_AUDIENCE
       value: sheet-bot
+    - name: SERVICE_ACCOUNT_JWKS_AUTH_TOKEN_PATH
+      value: /var/run/secrets/tokens/kubernetes-jwks-token
   projectedTokens:
+    - path: kubernetes-jwks-token
     - path: sheet-auth-token
       audience: sheet-auth
 - key: sheetCluster
@@ -301,7 +320,10 @@ imagePullSecrets:
       value: sheet-cluster
     - name: SHEET_INGRESS_BASE_URL
       secretKey: sheetIngressBaseUrl
+    - name: SERVICE_ACCOUNT_JWKS_AUTH_TOKEN_PATH
+      value: /var/run/secrets/tokens/kubernetes-jwks-token
   projectedTokens:
+    - path: kubernetes-jwks-token
     - path: sheet-auth-token
       audience: sheet-auth
   networkPolicyFrom:
@@ -371,6 +393,13 @@ imagePullSecrets:
       audience: sheet-cluster
     - path: sheet-bot-token
       audience: sheet-bot
+  networkPolicyFrom:
+    - app: sheet-apis
+      port: ingress-svc
+    - app: sheet-bot
+      port: ingress-svc
+    - app: sheet-cluster
+      port: ingress-svc
 - key: sheetWeb
   name: sheet-web
   portName: sheet-web-svc

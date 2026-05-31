@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Schema } from "effect";
 import { Api, SheetApisApi, SheetClusterApi } from "./api";
+import { DispatchAcceptedResult } from "./handlers/dispatch/schema";
 import { SheetClusterRpcs } from "./sheet-cluster-rpc";
 import { DispatchRoomOrderButtonMethods, SheetApisRpcs } from "./sheet-apis-rpc";
 
@@ -127,6 +128,20 @@ describe("Api", () => {
       "execution-id",
     );
     expect(() => Schema.decodeUnknownSync(discardRpc!.successSchema)(undefined)).toThrow();
+  });
+
+  it("accepts guild welcome dispatch results", () => {
+    expect(
+      Schema.decodeUnknownSync(DispatchAcceptedResult)({
+        executionId: "guild-welcome-execution",
+        operation: "guildWelcome",
+        status: "accepted",
+      }),
+    ).toEqual({
+      executionId: "guild-welcome-execution",
+      operation: "guildWelcome",
+      status: "accepted",
+    });
   });
 
   it("keeps long interaction tokens out of ingress bot paths", () => {
