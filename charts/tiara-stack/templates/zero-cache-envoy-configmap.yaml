@@ -73,7 +73,7 @@ data:
                                   retry_on: 5xx,gateway-error,connect-failure,reset
                                   num_retries: 2
                                   retry_back_off:
-                                    base_interval: 100ms
+                                    base_interval: 0.1s
                                     max_interval: 1s
                     http_filters:
                       - name: envoy.filters.http.lua

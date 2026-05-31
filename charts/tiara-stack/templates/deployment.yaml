@@ -2,6 +2,7 @@
 {{- range $svc := include "tiara-stack.serviceSpecs" . | fromYamlArray }}
 {{- $serviceValues := (index ($root.Values.services | default dict) $svc.key) | default dict -}}
 {{- $secretRef := $serviceValues.secretRef | default dict -}}
+{{- $needsRuntimeCertUpdate := or (eq $svc.key "sheetApis") (eq $svc.key "sheetCluster") -}}
 {{- if $serviceValues.enabled }}
 ---
 apiVersion: apps/v1
@@ -32,14 +33,19 @@ spec:
         app: {{ $svc.name }}
     spec:
       securityContext:
+        {{- if $needsRuntimeCertUpdate }}
+        runAsUser: 0
+        runAsGroup: 0
+        {{- else }}
         runAsNonRoot: true
         runAsUser: 1000
         runAsGroup: 1000
+        {{- end }}
         fsGroup: 1000
         seccompProfile:
           type: RuntimeDefault
       serviceAccountName: {{ if eq $svc.key "sheetCluster" }}{{ include "tiara-stack.sheetClusterName" $root }}{{ else }}{{ $svc.name }}{{ end }}
-      automountServiceAccountToken: {{ if or (eq $svc.name "sheet-auth") (eq $svc.key "sheetCluster") }}true{{ else }}false{{ end }}
+      automountServiceAccountToken: false
       {{- if eq $svc.name "sheet-ingress-server" }}
       terminationGracePeriodSeconds: 30
       {{- end }}
@@ -55,7 +61,7 @@ spec:
             {{- end }}
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
+            readOnlyRootFilesystem: {{ if $needsRuntimeCertUpdate }}false{{ else }}true{{ end }}
             capabilities:
               drop:
                 - ALL
@@ -154,6 +160,9 @@ spec:
               readOnly: true
               mountPath: "/var/run/secrets/tokens"
             {{- end }}
+            - name: {{ $svc.name }}-kube-root-ca
+              readOnly: true
+              mountPath: "/var/run/secrets/kubernetes.io/serviceaccount"
             {{- if $root.Values.global.caCertificate.enabled }}
             - name: {{ $svc.name }}-ca-certificate
               readOnly: true
@@ -181,6 +190,12 @@ spec:
                   audience: {{ $token.audience }}
               {{- end }}
         {{- end }}
+        - name: {{ $svc.name }}-kube-root-ca
+          configMap:
+            name: kube-root-ca.crt
+            items:
+              - key: ca.crt
+                path: ca.crt
         {{- if $root.Values.global.caCertificate.enabled }}
         - name: {{ $svc.name }}-ca-certificate
           configMap:
