@@ -1,38 +1,30 @@
+import { NodeFileSystem, NodeHttpServer } from "@effect/platform-node";
 import { HttpRouter, HttpServer, HttpServerResponse } from "effect/unstable/http";
-import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
-import { NodeHttpServer } from "@effect/platform-node";
-import {
-  DiscordApplication,
-  DiscordLayer,
-  discordRpcHandlersLayer,
-} from "dfx-discord-utils/discord";
-import { SheetBotRpcs } from "sheet-ingress-api/sheet-bot-rpc";
+import { HttpApiBuilder } from "effect/unstable/httpapi";
+import { DiscordApplication, DiscordLayer } from "dfx-discord-utils/discord";
+import { DiscordApi } from "dfx-discord-utils/discord/api";
+import { discordHttpApiHandlersLayer } from "dfx-discord-utils/discord/http";
 import { Layer } from "effect";
 import { createServer } from "http";
 import { cachesLayer } from "./discord/cache";
 import { discordConfigLayer } from "./discord/config";
-import { SheetBotRpcAuthorizationLive } from "./middlewares/discordRpcAuthorization/live";
+import { sheetBotHttpAuthorizationLayer } from "./middlewares/discordHttpAuthorization/live";
 
-const rpcHandlersLayer = discordRpcHandlersLayer.pipe(
+const discordHandlersLayer = discordHttpApiHandlersLayer.pipe(
   Layer.provide(DiscordApplication.restLayer),
   Layer.provide(DiscordLayer),
+  Layer.provide(NodeFileSystem.layer),
   Layer.provide([discordConfigLayer, cachesLayer]),
 );
 
-const rpcRoutesLayer = RpcServer.layerHttp({
-  group: SheetBotRpcs,
-  path: "/rpc",
-  protocol: "http",
-}).pipe(
-  Layer.provide(rpcHandlersLayer),
-  Layer.provide(SheetBotRpcAuthorizationLive),
-  Layer.provide(RpcSerialization.layerJson),
+const apiRoutesLayer = Layer.provide(HttpApiBuilder.layer(DiscordApi), [discordHandlersLayer]).pipe(
+  Layer.provide(sheetBotHttpAuthorizationLayer),
   Layer.merge(HttpRouter.add("GET", "/live", HttpServerResponse.empty({ status: 200 }))),
   Layer.merge(HttpRouter.add("GET", "/ready", HttpServerResponse.empty({ status: 200 }))),
-  Layer.provideMerge(HttpRouter.layer),
+  Layer.provide(HttpRouter.layer),
 );
 
-export const httpLayer = HttpRouter.serve(rpcRoutesLayer).pipe(
+export const httpLayer = HttpRouter.serve(apiRoutesLayer).pipe(
   HttpServer.withLogAddress,
   Layer.provide(NodeHttpServer.layer(createServer, { port: 3000 })),
 );

@@ -1,4 +1,11 @@
-import { HttpApi, HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi";
+import { Multipart } from "effect/unstable/http";
+import {
+  HttpApi,
+  HttpApiEndpoint,
+  HttpApiGroup,
+  HttpApiSchema,
+  OpenApi,
+} from "effect/unstable/httpapi";
 import { Schema } from "effect";
 import { Unauthorized } from "typhoon-core/error";
 import {
@@ -24,6 +31,7 @@ import {
   SendMessagePayloadSchema,
   UpdateMessagePayloadSchema,
   UpdateOriginalInteractionResponsePayloadSchema,
+  UpdateOriginalInteractionResponseWithFilesPayloadSchema,
 } from "./schema";
 
 // Path parameters
@@ -222,6 +230,23 @@ export class BotApi extends HttpApiGroup.make("bot")
       {
         params: UpdateOriginalInteractionResponsePayloadSchema.fields.params,
         payload: UpdateOriginalInteractionResponsePayloadSchema.fields.payload,
+        success: DiscordMessageSchema,
+        error: [...DiscordBotRestErrors, Unauthorized],
+      },
+    ),
+  )
+  .add(
+    HttpApiEndpoint.patch(
+      "updateOriginalInteractionResponseWithFiles",
+      "/bot/interactions/:interactionToken/original-response/files",
+      {
+        params: UpdateOriginalInteractionResponseWithFilesPayloadSchema.fields.params,
+        payload: Schema.Struct({
+          payload: Schema.fromJsonString(
+            UpdateOriginalInteractionResponseWithFilesPayloadSchema.fields.payload,
+          ),
+          files: Multipart.FilesSchema,
+        }).pipe(HttpApiSchema.asMultipart({ maxParts: 12, maxFileSize: 10 * 1024 * 1024 })),
         success: DiscordMessageSchema,
         error: [...DiscordBotRestErrors, Unauthorized],
       },

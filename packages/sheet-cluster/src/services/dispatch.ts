@@ -25,6 +25,12 @@ import type {
   CheckinDispatchResult,
   CheckinHandleButtonPayload,
   CheckinHandleButtonResult,
+  ChannelListConfigDispatchPayload,
+  ChannelListConfigDispatchResult,
+  ChannelSetDispatchPayload,
+  ChannelSetDispatchResult,
+  ChannelUnsetDispatchPayload,
+  ChannelUnsetDispatchResult,
   GuildWelcomeDispatchPayload,
   GuildWelcomeDispatchResult,
   KickoutDispatchPayload,
@@ -33,14 +39,30 @@ import type {
   RoomOrderButtonResult,
   RoomOrderDispatchPayload,
   RoomOrderDispatchResult,
+  ScheduleListDispatchPayload,
+  ScheduleListDispatchResult,
   ServiceStatusDispatchPayload,
   ServiceStatusDispatchResult,
+  ServerAddMonitorRoleDispatchPayload,
+  ServerAddMonitorRoleDispatchResult,
+  ServerListConfigDispatchPayload,
+  ServerListConfigDispatchResult,
+  ServerRemoveMonitorRoleDispatchPayload,
+  ServerRemoveMonitorRoleDispatchResult,
+  ServerSetAutoCheckinDispatchPayload,
+  ServerSetAutoCheckinDispatchResult,
+  ServerSetSheetDispatchPayload,
+  ServerSetSheetDispatchResult,
+  ScreenshotDispatchPayload,
+  ScreenshotDispatchResult,
   SlotButtonDispatchPayload,
   SlotButtonDispatchResult,
   SlotListDispatchPayload,
   SlotListDispatchResult,
   SlotOpenButtonPayload,
   SlotOpenButtonResult,
+  TeamListDispatchPayload,
+  TeamListDispatchResult,
 } from "sheet-ingress-api/sheet-apis-rpc";
 import * as Sheet from "sheet-ingress-api/schemas/sheet";
 import type { ServiceStatus } from "sheet-ingress-api/sheet-apis-rpc";
@@ -214,6 +236,32 @@ const makeSheetApisServices = (sheetApisClient: typeof SheetApisClient.Service) 
     guildConfigService: {
       getGuildConfig: (guildId: string) =>
         optionalArgumentError(sheetApis.guildConfig.getGuildConfig({ query: { guildId } })),
+      upsertGuildConfig: (
+        guildId: string,
+        config: {
+          readonly sheetId?: string | null | undefined;
+          readonly autoCheckin?: boolean | null | undefined;
+        },
+      ) => sheetApis.guildConfig.upsertGuildConfig({ payload: { guildId, config } }),
+      getGuildMonitorRoles: (guildId: string) =>
+        sheetApis.guildConfig.getGuildMonitorRoles({ query: { guildId } }),
+      addGuildMonitorRole: (guildId: string, roleId: string) =>
+        sheetApis.guildConfig.addGuildMonitorRole({ payload: { guildId, roleId } }),
+      removeGuildMonitorRole: (guildId: string, roleId: string) =>
+        sheetApis.guildConfig.removeGuildMonitorRole({ payload: { guildId, roleId } }),
+      upsertGuildChannelConfig: (
+        guildId: string,
+        channelId: string,
+        config: {
+          readonly name?: string | null | undefined;
+          readonly running?: boolean | null | undefined;
+          readonly roleId?: string | null | undefined;
+          readonly checkinChannelId?: string | null | undefined;
+        },
+      ) =>
+        sheetApis.guildConfig.upsertGuildChannelConfig({
+          payload: { guildId, channelId, config },
+        }),
       getGuildChannelById: (query: {
         readonly guildId: string;
         readonly channelId: string;
@@ -268,6 +316,10 @@ const makeSheetApisServices = (sheetApisClient: typeof SheetApisClient.Service) 
         sheetApis.schedule
           .getDayPopulatedSchedules({ query: { guildId, day, view: "filler" } })
           .pipe(Effect.map(({ schedules }) => schedules)),
+      dayPlayerSchedule: (guildId: string, day: number, accountId: string) =>
+        sheetApis.schedule.getDayPlayerSchedule({
+          query: { guildId, day, accountId, view: "filler" },
+        }),
       channelPopulatedMonitorSchedules: (guildId: string, channel: string) =>
         sheetApis.schedule
           .getChannelPopulatedSchedules({ query: { guildId, channel, view: "monitor" } })
@@ -278,6 +330,14 @@ const makeSheetApisServices = (sheetApisClient: typeof SheetApisClient.Service) 
     },
     statusService: {
       getServicesStatus: () => sheetApis.status.getServices({}),
+    },
+    playerService: {
+      getTeamsByIds: (guildId: string, ids: readonly string[]) =>
+        sheetApis.player.getTeamsByIds({ query: { guildId, ids } }),
+    },
+    screenshotService: {
+      getScreenshot: (guildId: string, channel: string, day: number) =>
+        sheetApis.screenshot.getScreenshot({ query: { guildId, channel, day } }),
     },
   };
 };
@@ -314,6 +374,20 @@ const makeMessageSink = (
 
 const mentionUser = (userId: string): string => `<@${userId}>`;
 
+const mentionChannel = (channelId: string): string => `<#${channelId}>`;
+
+const mentionRole = (roleId: string): string => `<@&${roleId}>`;
+
+const escapeMarkdown = (value: string): string =>
+  value
+    .replaceAll("\\", "\\\\")
+    .replaceAll("*", "\\*")
+    .replaceAll("_", "\\_")
+    .replaceAll("`", "\\`")
+    .replaceAll("~", "\\~")
+    .replaceAll("|", "\\|")
+    .replaceAll(">", "\\>");
+
 const bold = (value: string): string => `**${value}**`;
 
 const time = (epochSeconds: number): string => `<t:${Math.floor(epochSeconds)}:t>`;
@@ -335,6 +409,58 @@ const makeWebScheduleEmbed = () =>
     description: "📅 **Preview**: View your schedule online at <https://schedule.theerapakg.moe/>",
     color: 0x5865f2,
   });
+
+const isAutoCheckinEnabled = (autoCheckin: Option.Option<boolean>) =>
+  Option.getOrElse(autoCheckin, () => false);
+
+const formatChannelConfigFields = (config: {
+  readonly name: Option.Option<string>;
+  readonly running: Option.Option<boolean>;
+  readonly roleId: Option.Option<string>;
+  readonly checkinChannelId: Option.Option<string>;
+}) => [
+  {
+    name: "Name",
+    value: Option.match(config.name, {
+      onSome: escapeMarkdown,
+      onNone: () => "None!",
+    }),
+  },
+  { name: "Running channel", value: Option.getOrUndefined(config.running) ? "Yes" : "No" },
+  {
+    name: "Role",
+    value: Option.match(config.roleId, {
+      onSome: mentionRole,
+      onNone: () => "None!",
+    }),
+  },
+  {
+    name: "Checkin channel",
+    value: Option.match(config.checkinChannelId, {
+      onSome: mentionChannel,
+      onNone: () => "None!",
+    }),
+  },
+];
+
+const formatHourRanges = (hours: readonly number[]): string => {
+  if (hours.length === 0) return "None";
+  const sorted = [...hours].sort((a, b) => a - b);
+  const ranges: Array<{ start: number; end: number }> = [];
+  for (const h of sorted) {
+    const last = ranges[ranges.length - 1];
+    if (last === undefined) {
+      ranges.push({ start: h, end: h });
+    } else if (h === last.end + 1) {
+      last.end = h;
+    } else if (h !== last.end) {
+      ranges.push({ start: h, end: h });
+    }
+  }
+  return ranges
+    .map(({ start, end }) => (start === end ? `${start}` : `${start}-${end}`))
+    .join(", ");
+};
 
 const welcomeEmbed = () =>
   makeEmbed({
@@ -701,6 +827,8 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
       scheduleService,
       sheetService,
       statusService,
+      playerService,
+      screenshotService,
     } = makeSheetApisServices(sheetApisClient);
 
     const roomOrderButton = Effect.fn("DispatchService.roomOrderButton")(function* (
@@ -1871,6 +1999,342 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
           day: payload.day,
           messageType: payload.messageType,
         } satisfies SlotListDispatchResult;
+      }),
+      channelListConfig: Effect.fn("DispatchService.channelListConfig")(function* (
+        payload: ChannelListConfigDispatchPayload,
+      ) {
+        const maybeConfig = yield* guildConfigService.getGuildChannelById({
+          guildId: payload.guildId,
+          channelId: payload.channelId,
+        });
+        const config = yield* Option.match(maybeConfig, {
+          onSome: Effect.succeed,
+          onNone: () =>
+            Effect.fail(
+              makeArgumentError(
+                `Cannot list channel config, channel ${payload.channelId} is not configured`,
+              ),
+            ),
+        });
+
+        yield* botClient.updateOriginalInteractionResponse(payload.interactionToken, {
+          embeds: [
+            makeEmbed({
+              title: "Config for this channel",
+              fields: formatChannelConfigFields(config),
+            }),
+          ],
+        });
+
+        return {
+          guildId: payload.guildId,
+          channelId: payload.channelId,
+        } satisfies ChannelListConfigDispatchResult;
+      }),
+      channelSet: Effect.fn("DispatchService.channelSet")(function* (
+        payload: ChannelSetDispatchPayload,
+      ) {
+        const config = yield* guildConfigService.upsertGuildChannelConfig(
+          payload.guildId,
+          payload.channelId,
+          {
+            ...(payload.running === undefined ? {} : { running: payload.running }),
+            ...(payload.name === undefined ? {} : { name: payload.name }),
+            ...(payload.roleId === undefined ? {} : { roleId: payload.roleId }),
+            ...(payload.checkinChannelId === undefined
+              ? {}
+              : { checkinChannelId: payload.checkinChannelId }),
+          },
+        );
+
+        yield* botClient.updateOriginalInteractionResponse(payload.interactionToken, {
+          embeds: [
+            makeEmbed({
+              title: "Success!",
+              description: `${mentionChannel(payload.channelId)} configuration updated`,
+              fields: formatChannelConfigFields(config),
+            }),
+          ],
+        });
+
+        return {
+          guildId: payload.guildId,
+          channelId: payload.channelId,
+        } satisfies ChannelSetDispatchResult;
+      }),
+      channelUnset: Effect.fn("DispatchService.channelUnset")(function* (
+        payload: ChannelUnsetDispatchPayload,
+      ) {
+        const config = yield* guildConfigService.upsertGuildChannelConfig(
+          payload.guildId,
+          payload.channelId,
+          {
+            ...(payload.running ? { running: null } : {}),
+            ...(payload.name ? { name: null } : {}),
+            ...(payload.role ? { roleId: null } : {}),
+            ...(payload.checkinChannel ? { checkinChannelId: null } : {}),
+          },
+        );
+
+        yield* botClient.updateOriginalInteractionResponse(payload.interactionToken, {
+          embeds: [
+            makeEmbed({
+              title: "Success!",
+              description: `${mentionChannel(payload.channelId)} configuration updated`,
+              fields: formatChannelConfigFields(config),
+            }),
+          ],
+        });
+
+        return {
+          guildId: payload.guildId,
+          channelId: payload.channelId,
+        } satisfies ChannelUnsetDispatchResult;
+      }),
+      serverListConfig: Effect.fn("DispatchService.serverListConfig")(function* (
+        payload: ServerListConfigDispatchPayload,
+      ) {
+        const maybeGuildConfig = yield* guildConfigService.getGuildConfig(payload.guildId);
+        const guildConfig = yield* Option.match(maybeGuildConfig, {
+          onSome: Effect.succeed,
+          onNone: () =>
+            Effect.fail(makeArgumentError(`Cannot list config for guild ${payload.guildId}`)),
+        });
+        const monitorRoles = yield* guildConfigService.getGuildMonitorRoles(payload.guildId);
+        const sheetId = Option.match(guildConfig.sheetId, {
+          onSome: escapeMarkdown,
+          onNone: () => "None",
+        });
+
+        yield* botClient.updateOriginalInteractionResponse(payload.interactionToken, {
+          embeds: [
+            makeEmbed({
+              title: `Config for ${escapeMarkdown(payload.guildId)}`,
+              description: [
+                `Sheet id: ${sheetId}`,
+                `Auto check-in: ${
+                  isAutoCheckinEnabled(guildConfig.autoCheckin) ? "Enabled" : "Disabled"
+                }`,
+                `Monitor roles: ${
+                  monitorRoles.length > 0
+                    ? monitorRoles.map((role) => mentionRole(role.roleId)).join(", ")
+                    : "None"
+                }`,
+              ].join("\n"),
+            }),
+          ],
+        });
+
+        return {
+          guildId: payload.guildId,
+          monitorRoleCount: monitorRoles.length,
+        } satisfies ServerListConfigDispatchResult;
+      }),
+      serverAddMonitorRole: Effect.fn("DispatchService.serverAddMonitorRole")(function* (
+        payload: ServerAddMonitorRoleDispatchPayload,
+      ) {
+        yield* guildConfigService.addGuildMonitorRole(payload.guildId, payload.roleId);
+        yield* botClient.updateOriginalInteractionResponse(payload.interactionToken, {
+          embeds: [
+            makeEmbed({
+              title: "Success!",
+              description: `${mentionRole(payload.roleId)} is now a monitor role for ${escapeMarkdown(
+                payload.guildId,
+              )}`,
+            }),
+          ],
+        });
+        return {
+          guildId: payload.guildId,
+          roleId: payload.roleId,
+        } satisfies ServerAddMonitorRoleDispatchResult;
+      }),
+      serverRemoveMonitorRole: Effect.fn("DispatchService.serverRemoveMonitorRole")(function* (
+        payload: ServerRemoveMonitorRoleDispatchPayload,
+      ) {
+        yield* guildConfigService.removeGuildMonitorRole(payload.guildId, payload.roleId);
+        yield* botClient.updateOriginalInteractionResponse(payload.interactionToken, {
+          embeds: [
+            makeEmbed({
+              title: "Success!",
+              description: `${mentionRole(payload.roleId)} is no longer a monitor role for ${escapeMarkdown(
+                payload.guildId,
+              )}`,
+            }),
+          ],
+        });
+        return {
+          guildId: payload.guildId,
+          roleId: payload.roleId,
+        } satisfies ServerRemoveMonitorRoleDispatchResult;
+      }),
+      serverSetSheet: Effect.fn("DispatchService.serverSetSheet")(function* (
+        payload: ServerSetSheetDispatchPayload,
+      ) {
+        yield* guildConfigService.upsertGuildConfig(payload.guildId, { sheetId: payload.sheetId });
+        yield* botClient.updateOriginalInteractionResponse(payload.interactionToken, {
+          embeds: [
+            makeEmbed({
+              title: "Success!",
+              description: `Sheet id for ${escapeMarkdown(payload.guildId)} is now set to ${escapeMarkdown(
+                payload.sheetId,
+              )}`,
+            }),
+          ],
+        });
+        return {
+          guildId: payload.guildId,
+          sheetId: payload.sheetId,
+        } satisfies ServerSetSheetDispatchResult;
+      }),
+      serverSetAutoCheckin: Effect.fn("DispatchService.serverSetAutoCheckin")(function* (
+        payload: ServerSetAutoCheckinDispatchPayload,
+      ) {
+        const guildConfig = yield* guildConfigService.upsertGuildConfig(payload.guildId, {
+          autoCheckin: payload.autoCheckin,
+        });
+        const autoCheckin = isAutoCheckinEnabled(guildConfig.autoCheckin);
+        yield* botClient.updateOriginalInteractionResponse(payload.interactionToken, {
+          embeds: [
+            makeEmbed({
+              title: "Success!",
+              description: `Auto check-in for ${escapeMarkdown(payload.guildId)} is now ${
+                autoCheckin ? "enabled" : "disabled"
+              }.`,
+            }),
+          ],
+        });
+        return {
+          guildId: payload.guildId,
+          autoCheckin,
+        } satisfies ServerSetAutoCheckinDispatchResult;
+      }),
+      teamList: Effect.fn("DispatchService.teamList")(function* (payload: TeamListDispatchPayload) {
+        const teams = yield* playerService.getTeamsByIds(payload.guildId, [payload.targetUserId]);
+        const formattedTeams = teams
+          .flat()
+          // Exclude "tierer_hint" entries: these are internal/temporary suggestions used by the
+          // tiering process and should not be shown to users in the public team list.
+          .filter((team) => !team.tags.includes("tierer_hint"))
+          .sort((left, right) => {
+            const leftName = Option.getOrElse(left.playerName, () => "");
+            const rightName = Option.getOrElse(right.playerName, () => "");
+            return (
+              leftName.localeCompare(rightName) ||
+              Sheet.Team.getEffectValue(right) - Sheet.Team.getEffectValue(left)
+            );
+          })
+          .flatMap((team) =>
+            Option.match(team.teamName, {
+              onNone: () => [],
+              onSome: (teamName) => [
+                {
+                  teamName,
+                  tags: team.tags,
+                  lead: `${team.lead}`,
+                  backline: `${team.backline}`,
+                  talent: Option.match(team.talent, {
+                    onSome: (talent) => `${talent}k`,
+                    onNone: () => undefined,
+                  }),
+                  effectValue: `(+${Sheet.Team.getEffectValue(team)}%)`,
+                },
+              ],
+            }),
+          );
+
+        yield* botClient.updateOriginalInteractionResponse(payload.interactionToken, {
+          embeds: [
+            makeEmbed({
+              title: `${escapeMarkdown(payload.targetUsername)}'s Teams`,
+              description: formattedTeams.length === 0 ? "No teams found" : null,
+              fields: formattedTeams.map((team) => ({
+                name: escapeMarkdown(team.teamName),
+                value: [
+                  `Tags: ${team.tags.length === 0 ? "None" : escapeMarkdown(team.tags.join(", "))}`,
+                  `ISV: ${[team.lead, team.backline, team.talent].filter(Boolean).join("/")} ${
+                    team.effectValue
+                  }`,
+                ].join("\n"),
+              })),
+            }),
+          ],
+        });
+
+        return {
+          guildId: payload.guildId,
+          targetUserId: payload.targetUserId,
+          teamCount: formattedTeams.length,
+        } satisfies TeamListDispatchResult;
+      }),
+      scheduleList: Effect.fn("DispatchService.scheduleList")(function* (
+        payload: ScheduleListDispatchPayload,
+      ) {
+        const { schedule } = yield* scheduleService.dayPlayerSchedule(
+          payload.guildId,
+          payload.day,
+          payload.targetUserId,
+        );
+        yield* botClient.updateOriginalInteractionResponse(payload.interactionToken, {
+          embeds: [
+            makeEmbed({
+              title: `${escapeMarkdown(payload.targetUsername)}'s Schedule for Day ${payload.day}`,
+              description: schedule.invisible
+                ? "It is kinda foggy around here... This schedule is not visible to you yet."
+                : null,
+              fields: schedule.invisible
+                ? []
+                : [
+                    { name: "Fill", value: formatHourRanges(schedule.fillHours) },
+                    { name: "Overfill", value: formatHourRanges(schedule.overfillHours) },
+                    { name: "Standby", value: formatHourRanges(schedule.standbyHours) },
+                  ],
+            }),
+            makeWebScheduleEmbed(),
+          ],
+        });
+
+        return {
+          guildId: payload.guildId,
+          day: payload.day,
+          targetUserId: payload.targetUserId,
+          invisible: schedule.invisible,
+        } satisfies ScheduleListDispatchResult;
+      }),
+      screenshot: Effect.fn("DispatchService.screenshot")(function* (
+        payload: ScreenshotDispatchPayload,
+      ) {
+        const screenshot = yield* screenshotService.getScreenshot(
+          payload.guildId,
+          payload.channelName,
+          payload.day,
+        );
+        yield* botClient.updateOriginalInteractionResponseWithFiles(
+          payload.interactionToken,
+          {
+            attachments: [
+              {
+                id: "0",
+                description: `Day ${payload.day}'s schedule screenshot`,
+                filename: "screenshot.png",
+              },
+            ],
+          },
+          [
+            {
+              name: "screenshot.png",
+              contentType: "image/png",
+              content: screenshot,
+            },
+          ],
+        );
+
+        return {
+          guildId: payload.guildId,
+          channelName: payload.channelName,
+          day: payload.day,
+          byteLength: screenshot.byteLength,
+        } satisfies ScreenshotDispatchResult;
       }),
       serviceStatus: Effect.fn("DispatchService.serviceStatus")(function* (
         payload: ServiceStatusDispatchPayload,

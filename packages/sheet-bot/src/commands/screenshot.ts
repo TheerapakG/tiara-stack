@@ -1,23 +1,21 @@
 import { InteractionsRegistry } from "dfx/gateway";
-import { ApplicationIntegrationType, InteractionContextType } from "discord-api-types/v10";
 import { Ix } from "dfx/index";
-import { Effect, Layer, Option, pipe } from "effect";
+import { ApplicationIntegrationType, InteractionContextType } from "discord-api-types/v10";
+import { Effect, Layer } from "effect";
 import { discordGatewayLayer } from "../discord/gateway";
 import { CommandHelper, InteractionResponse } from "dfx-discord-utils/utils";
-import { Interaction } from "dfx-discord-utils/utils";
-import { EmbedService, ScreenshotService, SheetApisRequestContext } from "../services";
+import { SheetClusterClient, SheetClusterRequestContext } from "../services";
 import { discordApplicationLayer } from "../discord/application";
-
-const getInteractionGuildId = Effect.gen(function* () {
-  const interactionGuild = yield* Interaction.guild();
-  return pipe(
-    interactionGuild,
-    Option.map((guild) => (guild as { id: string }).id),
-  );
-});
+import {
+  makeDispatchBase,
+  requireNumber,
+  requireString,
+  resolveGuildId,
+} from "../utils/commandHelpers";
+import { runSheetClusterDispatch } from "../utils/sheetClusterDispatch";
 
 const makeScreenshotCommand = Effect.gen(function* () {
-  const screenshotService = yield* ScreenshotService;
+  const sheetClusterClient = yield* SheetClusterClient;
 
   return yield* CommandHelper.makeCommand(
     (builder) =>
@@ -45,40 +43,30 @@ const makeScreenshotCommand = Effect.gen(function* () {
           InteractionContextType.Guild,
           InteractionContextType.PrivateChannel,
         ),
-    SheetApisRequestContext.asInteractionUser(
-      Effect.fn("screenshot")(function* (command) {
-        const response = yield* InteractionResponse;
-        yield* response.deferReply();
+    Effect.fn("screenshot")(function* (command) {
+      const response = yield* InteractionResponse;
+      yield* response.deferReply();
 
-        const serverId = command.optionValueOptional("server_id");
-        const interactionGuildId = yield* getInteractionGuildId;
-        const guildId = pipe(
-          serverId,
-          Option.orElse(() => interactionGuildId),
-          Option.getOrThrow,
-        );
+      const guildId = yield* resolveGuildId(command.optionValueOptional("server_id"));
+      const channelName = yield* requireString(command.optionValue("channel_name"), "channel name");
+      const day = yield* requireNumber(command.optionValue("day"), "day");
+      const base = yield* makeDispatchBase;
 
-        const channelName = command.optionValue("channel_name");
-        const day = command.optionValue("day");
-
-        const screenshot = yield* screenshotService.getScreenshot(guildId, channelName, day);
-
-        yield* response.editReplyWithFiles(
-          [new File([Buffer.from(screenshot)], "screenshot.png", { type: "image/png" })],
-          {
+      yield* runSheetClusterDispatch(
+        response,
+        "the screenshot",
+        SheetClusterRequestContext.asInteractionUser(() =>
+          sheetClusterClient.get().dispatch.screenshot({
             payload: {
-              attachments: [
-                {
-                  id: "0",
-                  description: `Day ${day}'s schedule screenshot`,
-                  filename: "screenshot.png",
-                },
-              ],
+              ...base,
+              guildId,
+              channelName,
+              day,
             },
-          },
-        );
-      }),
-    ),
+          }),
+        )(),
+      );
+    }),
   );
 });
 
@@ -100,11 +88,6 @@ export const screenshotCommandLayer = Layer.effectDiscard(
   }),
 ).pipe(
   Layer.provide(
-    Layer.mergeAll(
-      discordGatewayLayer,
-      discordApplicationLayer,
-      EmbedService.layer,
-      ScreenshotService.layer,
-    ),
+    Layer.mergeAll(discordGatewayLayer, discordApplicationLayer, SheetClusterClient.layer),
   ),
 );

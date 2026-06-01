@@ -43,14 +43,6 @@
       "types": "./dist/middlewares/sheetApisRpcAuthorization/tag.d.mts",
       "default": "./dist/middlewares/sheetApisRpcAuthorization/tag.mjs"
     },
-    "./middlewares/sheetBotRpcAuthorization/tag": {
-      "types": "./dist/middlewares/sheetBotRpcAuthorization/tag.d.mts",
-      "default": "./dist/middlewares/sheetBotRpcAuthorization/tag.mjs"
-    },
-    "./middlewares/sheetBotDispatchRpcAuthorization/tag": {
-      "types": "./dist/middlewares/sheetBotDispatchRpcAuthorization/tag.d.mts",
-      "default": "./dist/middlewares/sheetBotDispatchRpcAuthorization/tag.mjs"
-    },
     "./middlewares/sheetBotServiceAuthorization/tag": {
       "types": "./dist/middlewares/sheetBotServiceAuthorization/tag.d.mts",
       "default": "./dist/middlewares/sheetBotServiceAuthorization/tag.mjs"
@@ -78,10 +70,6 @@
     "./sheet-cluster-rpc": {
       "types": "./dist/sheet-cluster-rpc.d.mts",
       "default": "./dist/sheet-cluster-rpc.mjs"
-    },
-    "./sheet-bot-rpc": {
-      "types": "./dist/sheet-bot-rpc.d.mts",
-      "default": "./dist/sheet-bot-rpc.mjs"
     },
     "./schemas/*": {
       "types": "./dist/schemas/*.d.mts",

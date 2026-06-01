@@ -1,6 +1,6 @@
 import { NodeFileSystem, NodeHttpClient, NodeHttpServer, NodeRuntime } from "@effect/platform-node";
 import { createServer } from "http";
-import { Effect, Layer, Logger, Option } from "effect";
+import { Effect, FileSystem, Layer, Logger, Option } from "effect";
 import { HttpMiddleware, HttpRouter, HttpServer } from "effect/unstable/http";
 import {
   HttpApiBuilder,
@@ -15,6 +15,7 @@ import {
   interactionTokenExpirySafetyMarginMs,
   interactionTokenLifetimeMs,
 } from "sheet-ingress-api/sheet-apis-rpc";
+import type { DispatchAuthorizationSnapshot } from "sheet-ingress-api/sheet-cluster-workflows";
 import { Unauthorized } from "typhoon-core/error";
 import { dotEnvConfigProviderLayer } from "typhoon-core/config";
 import { ArgumentError, makeArgumentError } from "typhoon-core/error";
@@ -34,7 +35,12 @@ import { SheetClusterForwardingClient } from "./services/sheetClusterForwardingC
 import { SheetApisForwardingClient } from "./services/sheetApisForwardingClient";
 import { SheetApisRpcTokens } from "./services/sheetApisRpcTokens";
 import { SheetBotForwardingClient } from "./services/sheetBotForwardingClient";
-import { clientArgsFrom, forwardSheetBot, forwardSheetBotPayload } from "./services/sheetBotProxy";
+import {
+  clientArgsFrom,
+  forwardSheetBot,
+  forwardSheetBotPayload,
+  type SheetBotProxyHandler,
+} from "./services/sheetBotProxy";
 import { ServiceStatusService } from "./services/serviceStatus";
 import { normalizeServicesStatusResponse } from "./services/statusResponse";
 import { TelemetryLive } from "./telemetry";
@@ -228,6 +234,7 @@ const statusGetServices: SheetApisProxyHandler<
 const forwardSheetClusterDispatch =
   <EndpointName extends SheetClusterDispatchEndpointName>(
     endpoint: EndpointName,
+    authorization?: WorkflowAuthorizationSnapshot,
   ): SheetClusterDispatchHandler<EndpointName, never> =>
   (rawArgs) =>
     Effect.gen(function* () {
@@ -264,6 +271,7 @@ const forwardSheetClusterDispatch =
       const basePayload = {
         requester: { accountId: requester.accountId, userId: requester.userId },
         payload: workflowPayload,
+        ...(authorization === undefined ? {} : { authorization }),
         ...(interactionDeadlineEpochMs === undefined ? {} : { interactionDeadlineEpochMs }),
       };
       const requireMessageId = () =>
@@ -325,14 +333,23 @@ const authorizedSheetClusterDispatch =
     endpoint: EndpointName,
     authorize: (
       args: SheetClusterDispatchRequest<EndpointName>,
-    ) => Effect.Effect<void, SheetClusterDispatchError<EndpointName>, R>,
+    ) => Effect.Effect<
+      WorkflowAuthorizationSnapshot | void,
+      SheetClusterDispatchError<EndpointName>,
+      R
+    >,
   ): SheetClusterDispatchHandler<EndpointName, R> =>
   (rawArgs) =>
     Effect.gen(function* () {
       const args = rawArgs as SheetClusterDispatchRequest<EndpointName>;
-      yield* authorize(args);
-      return yield* forwardSheetClusterDispatch(endpoint)(rawArgs as never);
+      const authorization = yield* authorize(args);
+      return yield* forwardSheetClusterDispatch(
+        endpoint,
+        authorization ?? undefined,
+      )(rawArgs as never);
     }) as ReturnType<SheetClusterDispatchHandler<EndpointName, R>>;
+
+type WorkflowAuthorizationSnapshot = DispatchAuthorizationSnapshot;
 
 const requireService = () =>
   Effect.gen(function* () {
@@ -362,10 +379,51 @@ const requireGuild = (scope: "member" | "monitor" | "manage", guildId: string) =
     }
   });
 
+const requireGuildSnapshot = (scope: WorkflowAuthorizationSnapshot["scope"], guildId: string) =>
+  requireGuild(scope, guildId).pipe(Effect.as({ guildId, scope }));
+
+const buildFileUploadFormData = (
+  payload: {
+    readonly payload: unknown;
+    readonly files: ReadonlyArray<{
+      readonly path: string;
+      readonly name: string;
+      readonly contentType: string;
+    }>;
+  },
+  fs: FileSystem.FileSystem,
+) =>
+  Effect.gen(function* () {
+    const formData = new FormData();
+    formData.append("payload", JSON.stringify(payload.payload));
+
+    yield* Effect.forEach(
+      payload.files,
+      (file) =>
+        Effect.gen(function* () {
+          const content = yield* fs.readFile(file.path);
+          formData.append(
+            "files",
+            new File([content as BlobPart], file.name, { type: file.contentType }),
+          );
+        }),
+      { concurrency: 1 },
+    );
+
+    return formData;
+  });
+
 const requireSelfOrMonitor = (guildId: string, accountId: string) =>
   Effect.gen(function* () {
     const authorization = yield* AuthorizationService;
     yield* authorization.requireDiscordAccountIdOrMonitorGuild(guildId, accountId);
+  });
+
+const requireSelfOrMonitorSnapshot = (guildId: string, accountId: string) =>
+  Effect.gen(function* () {
+    const user = yield* SheetAuthUser;
+    yield* requireSelfOrMonitor(guildId, accountId);
+    return user.accountId === accountId ? undefined : { guildId, scope: "monitor" as const };
   });
 
 const asSheetApisProxyAuthorization = <
@@ -735,6 +793,72 @@ const makeApiLayer = () => {
         )
         .handle("serviceStatus", authorizedSheetClusterDispatch("serviceStatus", requireNonService))
         .handle("guildWelcome", authorizedSheetClusterDispatch("guildWelcome", requireService))
+        .handle(
+          "channelListConfig",
+          authorizedSheetClusterDispatch("channelListConfig", ({ payload }) =>
+            requireGuildSnapshot("manage", payload.guildId),
+          ),
+        )
+        .handle(
+          "channelSet",
+          authorizedSheetClusterDispatch("channelSet", ({ payload }) =>
+            requireGuildSnapshot("manage", payload.guildId),
+          ),
+        )
+        .handle(
+          "channelUnset",
+          authorizedSheetClusterDispatch("channelUnset", ({ payload }) =>
+            requireGuildSnapshot("manage", payload.guildId),
+          ),
+        )
+        .handle(
+          "serverListConfig",
+          authorizedSheetClusterDispatch("serverListConfig", ({ payload }) =>
+            requireGuildSnapshot("manage", payload.guildId),
+          ),
+        )
+        .handle(
+          "serverAddMonitorRole",
+          authorizedSheetClusterDispatch("serverAddMonitorRole", ({ payload }) =>
+            requireGuildSnapshot("manage", payload.guildId),
+          ),
+        )
+        .handle(
+          "serverRemoveMonitorRole",
+          authorizedSheetClusterDispatch("serverRemoveMonitorRole", ({ payload }) =>
+            requireGuildSnapshot("manage", payload.guildId),
+          ),
+        )
+        .handle(
+          "serverSetSheet",
+          authorizedSheetClusterDispatch("serverSetSheet", ({ payload }) =>
+            requireGuildSnapshot("manage", payload.guildId),
+          ),
+        )
+        .handle(
+          "serverSetAutoCheckin",
+          authorizedSheetClusterDispatch("serverSetAutoCheckin", ({ payload }) =>
+            requireGuildSnapshot("manage", payload.guildId),
+          ),
+        )
+        .handle(
+          "teamList",
+          authorizedSheetClusterDispatch("teamList", ({ payload }) =>
+            requireSelfOrMonitorSnapshot(payload.guildId, payload.targetUserId),
+          ),
+        )
+        .handle(
+          "scheduleList",
+          authorizedSheetClusterDispatch("scheduleList", ({ payload }) =>
+            requireSelfOrMonitorSnapshot(payload.guildId, payload.targetUserId),
+          ),
+        )
+        .handle(
+          "screenshot",
+          authorizedSheetClusterDispatch("screenshot", ({ payload }) =>
+            requireGuildSnapshot("monitor", payload.guildId),
+          ),
+        )
         .handle(
           DispatchRoomOrderButtonMethods.previous.endpointName,
           authorizedSheetClusterDispatch(
@@ -1176,21 +1300,52 @@ const makeApiLayer = () => {
           "updateOriginalInteractionResponse",
           forwardSheetBot("bot", "updateOriginalInteractionResponse"),
         )
+        .handle(
+          "updateOriginalInteractionResponseWithFiles",
+          ({ params: { interactionToken }, payload }) =>
+            Effect.gen(function* () {
+              const client = yield* SheetBotForwardingClient;
+              const fs = yield* FileSystem.FileSystem;
+              const formData = yield* buildFileUploadFormData(payload, fs);
+              return yield* client.bot.updateOriginalInteractionResponseWithFiles({
+                params: { interactionToken },
+                payload: formData,
+              });
+            }) as ReturnType<
+              SheetBotProxyHandler<"bot", "updateOriginalInteractionResponseWithFiles">
+            >,
+        )
         .handle("createPin", forwardSheetBot("bot", "createPin"))
         .handle("deleteMessage", forwardSheetBot("bot", "deleteMessage"))
         .handle("addGuildMemberRole", forwardSheetBot("bot", "addGuildMemberRole"))
         .handle("removeGuildMemberRole", forwardSheetBot("bot", "removeGuildMemberRole")),
     ),
     HttpApiBuilder.group(Api, "ingressBot", (handlers) =>
-      handlers.handle("updateOriginalInteractionResponse", ({ payload }) =>
-        forwardSheetBot(
-          "bot",
-          "updateOriginalInteractionResponse",
-        )({
-          params: { interactionToken: payload.interactionToken },
-          payload: payload.payload,
-        } as never),
-      ),
+      handlers
+        .handle("updateOriginalInteractionResponse", ({ payload }) =>
+          forwardSheetBot(
+            "bot",
+            "updateOriginalInteractionResponse",
+          )({
+            params: { interactionToken: payload.interactionToken },
+            payload: payload.payload,
+          } as never),
+        )
+        .handle(
+          "updateOriginalInteractionResponseWithFiles",
+          ({ payload }) =>
+            Effect.gen(function* () {
+              const client = yield* SheetBotForwardingClient;
+              const fs = yield* FileSystem.FileSystem;
+              const formData = yield* buildFileUploadFormData(payload, fs);
+              return yield* client.bot.updateOriginalInteractionResponseWithFiles({
+                params: { interactionToken: payload.interactionToken },
+                payload: formData,
+              });
+            }) as ReturnType<
+              SheetBotProxyHandler<"bot", "updateOriginalInteractionResponseWithFiles">
+            >,
+        ),
     ),
     HttpApiBuilder.group(Api, "cache", (handlers) =>
       handlers
@@ -1263,6 +1418,7 @@ const MainLive = HttpLive.pipe(
   Layer.provide(TelemetryLive),
   Layer.provide(Logger.layer([Logger.consoleLogFmt])),
   Layer.provide(NodeHttpClient.layerFetch),
+  Layer.provide(NodeFileSystem.layer),
   Layer.provide(configProviderLayer),
 );
 

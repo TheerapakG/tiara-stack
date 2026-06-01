@@ -30,10 +30,15 @@ type TokenCacheEntry = {
   readonly timeToLive: Duration.Duration;
 };
 
-type MessagePayload = Schema.Schema.Type<typeof DiscordMessageRequestSchema>;
+export type MessagePayload = Schema.Schema.Type<typeof DiscordMessageRequestSchema>;
 type DiscordMessage = {
   readonly id: string;
   readonly channel_id: string;
+};
+export type MessageFilePayload = {
+  readonly name: string;
+  readonly contentType: string;
+  readonly content: Uint8Array;
 };
 
 type DiscordClient = {
@@ -77,6 +82,9 @@ type DiscordClient = {
         readonly interactionToken: string;
         readonly payload: MessagePayload;
       };
+    }) => Effect.Effect<DiscordMessage, unknown>;
+    readonly updateOriginalInteractionResponseWithFiles: (args: {
+      readonly payload: FormData;
     }) => Effect.Effect<DiscordMessage, unknown>;
   };
   readonly cache: {
@@ -223,6 +231,32 @@ export class IngressBotClient extends Context.Service<IngressBotClient>()("Ingre
         yield* Effect.annotateCurrentSpan({ hasInteractionToken: interactionToken.length > 0 });
         return yield* client.ingressBot.updateOriginalInteractionResponse({
           payload: { interactionToken, payload },
+        });
+      }),
+      updateOriginalInteractionResponseWithFiles: Effect.fn(
+        "IngressBotClient.updateOriginalInteractionResponseWithFiles",
+      )(function* (
+        interactionToken: string,
+        payload: MessagePayload,
+        files: ReadonlyArray<MessageFilePayload>,
+      ) {
+        yield* Effect.annotateCurrentSpan({
+          hasInteractionToken: interactionToken.length > 0,
+          fileCount: files.length,
+        });
+        const formData = new FormData();
+        formData.append("interactionToken", interactionToken);
+        formData.append("payload", JSON.stringify(payload));
+        for (const file of files) {
+          formData.append(
+            "files",
+            new File([file.content as BlobPart], file.name, {
+              type: file.contentType,
+            }),
+          );
+        }
+        return yield* client.ingressBot.updateOriginalInteractionResponseWithFiles({
+          payload: formData,
         });
       }),
       createPin: Effect.fn("IngressBotClient.createPin")(function* (

@@ -3,28 +3,12 @@ import { Cause, ConfigProvider, Deferred, Effect, Exit, Fiber } from "effect";
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http";
 import { SheetApisRpcTokens } from "./sheetApisRpcTokens";
 import { SheetBotForwardingClient } from "./sheetBotForwardingClient";
-import { SheetBotRpcClient } from "./sheetBotRpcClient";
+import { SheetBotHttpClient } from "./sheetBotHttpClient";
 
 const makeSheetApisRpcTokens = () =>
   ({
     getServiceToken: () => Effect.succeed("ingress-token"),
   }) as never;
-
-const getRpcRequestHeaders = (request: HttpClientRequest.HttpClientRequest) => {
-  if (request.body._tag !== "Uint8Array") return [];
-
-  const body = new TextDecoder().decode(request.body.body);
-  const parsed = JSON.parse(body) as
-    | {
-        readonly headers?: ReadonlyArray<readonly [string, string]>;
-      }
-    | Array<{
-        readonly headers?: ReadonlyArray<readonly [string, string]>;
-      }>;
-  const message = Array.isArray(parsed) ? parsed[0] : parsed;
-
-  return message?.headers ?? [];
-};
 
 const run = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
@@ -36,7 +20,7 @@ const run = <A, E, R>(
   Effect.runPromise(
     Effect.scoped(
       effect.pipe(
-        Effect.provide(SheetBotRpcClient.layer),
+        Effect.provide(SheetBotHttpClient.layer),
         Effect.provideService(SheetApisRpcTokens, sheetApisRpcTokens),
         Effect.provideService(HttpClient.HttpClient, httpClient),
         Effect.provide(
@@ -64,7 +48,7 @@ describe("SheetBotForwardingClient", () => {
     expect(client.cache.getMember).toEqual(expect.any(Function));
   });
 
-  it("adds the ingress bearer token to RPC HTTP requests", async () => {
+  it("adds the ingress bearer token to sheet-bot HTTP API requests", async () => {
     const requestReceived = Deferred.makeUnsafe<HttpClientRequest.HttpClientRequest>();
     const httpClient = HttpClient.make((request) => {
       return Deferred.succeed(requestReceived, request).pipe(
@@ -83,14 +67,11 @@ describe("SheetBotForwardingClient", () => {
       httpClient,
     );
 
-    expect(request.url).toBe("http://sheet-bot/rpc/");
-    expect(getRpcRequestHeaders(request)).toContainEqual([
-      "x-sheet-ingress-auth",
-      "Bearer ingress-token",
-    ]);
+    expect(request.url).toBe("http://sheet-bot/application");
+    expect(request.headers["x-sheet-ingress-auth"]).toBe("Bearer ingress-token");
   });
 
-  it("surfaces ingress token failures as RPC client errors", async () => {
+  it("surfaces ingress token failures as HTTP client errors", async () => {
     const ingressTokenFailure = new Error("ingress token refresh failed");
     const sheetApisRpcTokens = {
       getServiceToken: () => Effect.fail(ingressTokenFailure),
@@ -102,7 +83,7 @@ describe("SheetBotForwardingClient", () => {
           const client = yield* SheetBotForwardingClient.make;
           return yield* client.application.getApplication();
         }).pipe(
-          Effect.provide(SheetBotRpcClient.layer),
+          Effect.provide(SheetBotHttpClient.layer),
           Effect.provideService(SheetApisRpcTokens, sheetApisRpcTokens),
           Effect.provideService(
             HttpClient.HttpClient,

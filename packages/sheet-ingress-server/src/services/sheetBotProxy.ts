@@ -17,7 +17,7 @@ type SheetBotEndpointName<GroupName extends SheetBotGroupName> = Extract<
   HttpApiEndpoint.Name<HttpApiGroup.Endpoints<SheetBotGroup<GroupName>>>,
   string
 >;
-type SheetBotProxyHandler<
+export type SheetBotProxyHandler<
   GroupName extends SheetBotGroupName,
   EndpointName extends SheetBotEndpointName<GroupName>,
 > = HttpApiEndpoint.HandlerWithName<

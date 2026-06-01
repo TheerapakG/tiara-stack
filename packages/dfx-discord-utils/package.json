@@ -54,9 +54,9 @@
       "types": "./dist/discord/gateway.d.mts",
       "default": "./dist/discord/gateway.mjs"
     },
-    "./discord/rpc": {
-      "types": "./dist/discord/rpc.d.mts",
-      "default": "./dist/discord/rpc.mjs"
+    "./discord/http": {
+      "types": "./dist/discord/http.d.mts",
+      "default": "./dist/discord/http.mjs"
     },
     "./discord/discordApiClient": {
       "types": "./dist/discord/discordApiClient.d.mts",

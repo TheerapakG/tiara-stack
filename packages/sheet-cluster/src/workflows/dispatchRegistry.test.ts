@@ -149,6 +149,17 @@ const makeDispatchServiceMock = (overrides: Partial<DispatchServiceMock>): Dispa
   roomOrderNextButton: unexpectedDispatchServiceCall("roomOrderNextButton"),
   roomOrderSendButton: unexpectedDispatchServiceCall("roomOrderSendButton"),
   roomOrderPinTentativeButton: unexpectedDispatchServiceCall("roomOrderPinTentativeButton"),
+  channelListConfig: unexpectedDispatchServiceCall("channelListConfig"),
+  channelSet: unexpectedDispatchServiceCall("channelSet"),
+  channelUnset: unexpectedDispatchServiceCall("channelUnset"),
+  serverListConfig: unexpectedDispatchServiceCall("serverListConfig"),
+  serverAddMonitorRole: unexpectedDispatchServiceCall("serverAddMonitorRole"),
+  serverRemoveMonitorRole: unexpectedDispatchServiceCall("serverRemoveMonitorRole"),
+  serverSetSheet: unexpectedDispatchServiceCall("serverSetSheet"),
+  serverSetAutoCheckin: unexpectedDispatchServiceCall("serverSetAutoCheckin"),
+  teamList: unexpectedDispatchServiceCall("teamList"),
+  scheduleList: unexpectedDispatchServiceCall("scheduleList"),
+  screenshot: unexpectedDispatchServiceCall("screenshot"),
   ...overrides,
 });
 
@@ -257,6 +268,17 @@ describe("dispatch workflow registry", () => {
       "roomOrderNextButton",
       "roomOrderSendButton",
       "roomOrderPinTentativeButton",
+      "channelListConfig",
+      "channelSet",
+      "channelUnset",
+      "serverListConfig",
+      "serverAddMonitorRole",
+      "serverRemoveMonitorRole",
+      "serverSetSheet",
+      "serverSetAutoCheckin",
+      "teamList",
+      "scheduleList",
+      "screenshot",
     ]);
   });
 
@@ -350,6 +372,172 @@ describe("dispatch workflow registry", () => {
         ),
       ),
     );
+  });
+
+  it("requires manage-guild authorization snapshots for config mutation workflows", async () => {
+    type TestAuthorization = {
+      readonly guildId: string;
+      readonly scope: "member" | "monitor" | "manage";
+    };
+    const authorization: TestAuthorization = { guildId: "guild-1", scope: "manage" };
+    const unauthorized: TestAuthorization = { guildId: "guild-1", scope: "monitor" };
+    const cases = [
+      (currentAuthorization: typeof authorization) =>
+        dispatchWorkflowRegistry.channelSet.authorize({
+          requester,
+          authorization: currentAuthorization,
+          payload: {
+            dispatchRequestId: "dispatch-channel-set",
+            guildId: "guild-1",
+            channelId: "channel-1",
+            running: true,
+            interactionToken: "interaction-token",
+            interactionDeadlineEpochMs,
+          },
+        }),
+      (currentAuthorization: typeof authorization) =>
+        dispatchWorkflowRegistry.channelUnset.authorize({
+          requester,
+          authorization: currentAuthorization,
+          payload: {
+            dispatchRequestId: "dispatch-channel-unset",
+            guildId: "guild-1",
+            channelId: "channel-1",
+            running: true,
+            interactionToken: "interaction-token",
+            interactionDeadlineEpochMs,
+          },
+        }),
+      (currentAuthorization: typeof authorization) =>
+        dispatchWorkflowRegistry.serverAddMonitorRole.authorize({
+          requester,
+          authorization: currentAuthorization,
+          payload: {
+            dispatchRequestId: "dispatch-server-add-monitor-role",
+            guildId: "guild-1",
+            roleId: "role-1",
+            interactionToken: "interaction-token",
+            interactionDeadlineEpochMs,
+          },
+        }),
+      (currentAuthorization: typeof authorization) =>
+        dispatchWorkflowRegistry.serverRemoveMonitorRole.authorize({
+          requester,
+          authorization: currentAuthorization,
+          payload: {
+            dispatchRequestId: "dispatch-server-remove-monitor-role",
+            guildId: "guild-1",
+            roleId: "role-1",
+            interactionToken: "interaction-token",
+            interactionDeadlineEpochMs,
+          },
+        }),
+      (currentAuthorization: typeof authorization) =>
+        dispatchWorkflowRegistry.serverSetSheet.authorize({
+          requester,
+          authorization: currentAuthorization,
+          payload: {
+            dispatchRequestId: "dispatch-server-set-sheet",
+            guildId: "guild-1",
+            sheetId: "sheet-1",
+            interactionToken: "interaction-token",
+            interactionDeadlineEpochMs,
+          },
+        }),
+      (currentAuthorization: typeof authorization) =>
+        dispatchWorkflowRegistry.serverSetAutoCheckin.authorize({
+          requester,
+          authorization: currentAuthorization,
+          payload: {
+            dispatchRequestId: "dispatch-server-set-auto-checkin",
+            guildId: "guild-1",
+            autoCheckin: true,
+            interactionToken: "interaction-token",
+            interactionDeadlineEpochMs,
+          },
+        }),
+    ];
+
+    for (const authorize of cases) {
+      await Effect.runPromise(authorize(authorization));
+      const denied = await Effect.runPromiseExit(authorize(unauthorized));
+      expect(denied._tag).toBe("Failure");
+    }
+  });
+
+  it("requires monitor-guild authorization snapshots for screenshot workflow", async () => {
+    const request = {
+      requester,
+      authorization: { guildId: "guild-1", scope: "monitor" as const },
+      payload: {
+        dispatchRequestId: "dispatch-screenshot",
+        guildId: "guild-1",
+        channelName: "run",
+        day: 1,
+        interactionToken: "interaction-token",
+        interactionDeadlineEpochMs,
+      },
+    };
+
+    await Effect.runPromise(dispatchWorkflowRegistry.screenshot.authorize(request));
+    const denied = await Effect.runPromiseExit(
+      dispatchWorkflowRegistry.screenshot.authorize({
+        ...request,
+        authorization: { guildId: "guild-2", scope: "monitor" as const },
+      }),
+    );
+    expect(denied._tag).toBe("Failure");
+  });
+
+  it("allows team and schedule list for self or monitor snapshots", async () => {
+    const base = {
+      requester,
+      payload: {
+        guildId: "guild-1",
+        targetUserId: requester.accountId,
+        targetUsername: "Requester",
+        interactionToken: "interaction-token",
+        interactionDeadlineEpochMs,
+      },
+    };
+
+    await Effect.runPromise(
+      dispatchWorkflowRegistry.teamList.authorize({
+        ...base,
+        payload: { ...base.payload, dispatchRequestId: "dispatch-team-list" },
+      }),
+    );
+    await Effect.runPromise(
+      dispatchWorkflowRegistry.scheduleList.authorize({
+        ...base,
+        payload: { ...base.payload, dispatchRequestId: "dispatch-schedule-list", day: 1 },
+      }),
+    );
+
+    const monitorAuthorization = { guildId: "guild-1", scope: "monitor" as const };
+    await Effect.runPromise(
+      dispatchWorkflowRegistry.teamList.authorize({
+        ...base,
+        authorization: monitorAuthorization,
+        payload: {
+          ...base.payload,
+          dispatchRequestId: "dispatch-team-list-other",
+          targetUserId: "account-2",
+        },
+      }),
+    );
+    const denied = await Effect.runPromiseExit(
+      dispatchWorkflowRegistry.scheduleList.authorize({
+        ...base,
+        payload: {
+          ...base.payload,
+          dispatchRequestId: "dispatch-schedule-list-other",
+          day: 1,
+          targetUserId: "account-2",
+        },
+      }),
+    );
+    expect(denied._tag).toBe("Failure");
   });
 
   it("routes slot workflows to DispatchService", async () => {

@@ -1,6 +1,7 @@
 import { Effect, Layer, Option, Schema } from "effect";
 import { Activity } from "effect/unstable/workflow";
 import {
+  type DispatchAuthorizationSnapshot,
   type DispatchWorkflowOperation,
   type DispatchRequester,
 } from "sheet-ingress-api/sheet-cluster-workflows";
@@ -21,6 +22,9 @@ import { DispatchService, IngressBotClient, SheetApisClient } from "@/services";
 import {
   DispatchCheckinButtonWorkflow,
   DispatchCheckinWorkflow,
+  DispatchChannelListConfigWorkflow,
+  DispatchChannelSetWorkflow,
+  DispatchChannelUnsetWorkflow,
   DispatchGuildWelcomeWorkflow,
   DispatchKickoutWorkflow,
   DispatchRoomOrderNextButtonWorkflow,
@@ -28,10 +32,18 @@ import {
   DispatchRoomOrderPreviousButtonWorkflow,
   DispatchRoomOrderSendButtonWorkflow,
   DispatchRoomOrderWorkflow,
+  DispatchScheduleListWorkflow,
   DispatchServiceStatusWorkflow,
+  DispatchServerAddMonitorRoleWorkflow,
+  DispatchServerListConfigWorkflow,
+  DispatchServerRemoveMonitorRoleWorkflow,
+  DispatchServerSetAutoCheckinWorkflow,
+  DispatchServerSetSheetWorkflow,
+  DispatchScreenshotWorkflow,
   DispatchSlotButtonWorkflow,
   DispatchSlotListWorkflow,
   DispatchSlotOpenButtonWorkflow,
+  DispatchTeamListWorkflow,
   DispatchWorkflows,
 } from "./dispatchWorkflows";
 
@@ -200,6 +212,44 @@ const requireSlotOpenButtonAccess = (messageId: string) =>
 
     return messageSlot;
   });
+
+const scopeRank = {
+  member: 0,
+  monitor: 1,
+  manage: 2,
+} as const;
+
+const requireAuthorizedGuild = (
+  authorization: DispatchAuthorizationSnapshot | undefined,
+  guildId: string,
+  scope: DispatchAuthorizationSnapshot["scope"],
+) =>
+  Effect.gen(function* () {
+    if (authorization?.guildId === guildId && scopeRank[authorization.scope] >= scopeRank[scope]) {
+      return;
+    }
+
+    return yield* Effect.fail(
+      new Unauthorized({
+        message: `Dispatch requester is not authorized to ${scope} guild ${guildId}`,
+      }),
+    );
+  });
+
+const requireSelfOrAuthorizedGuild = (
+  request: {
+    readonly requester: DispatchRequester;
+    readonly authorization?: DispatchAuthorizationSnapshot | undefined;
+    readonly payload: {
+      readonly guildId: string;
+      readonly targetUserId: string;
+    };
+  },
+  scope: DispatchAuthorizationSnapshot["scope"],
+) =>
+  request.requester.accountId === request.payload.targetUserId
+    ? Effect.void
+    : requireAuthorizedGuild(request.authorization, request.payload.guildId, scope);
 
 export const makeWorkflowHandler =
   <TWorkflow extends DispatchWorkflow, TAuthorization, RAuthorize, RExecute>(
@@ -422,6 +472,152 @@ export const dispatchWorkflowRegistry = {
         return yield* service.roomOrderPinTentativeButton(request.payload, authorizedRoomOrder);
       }),
   },
+  channelListConfig: {
+    operation: "channelListConfig",
+    workflow: DispatchChannelListConfigWorkflow,
+    getInteractionToken: (request: typeof DispatchChannelListConfigWorkflow.payloadSchema.Type) =>
+      request.payload.interactionToken,
+    authorize: (request: typeof DispatchChannelListConfigWorkflow.payloadSchema.Type) =>
+      requireAuthorizedGuild(request.authorization, request.payload.guildId, "manage"),
+    execute: (request: typeof DispatchChannelListConfigWorkflow.payloadSchema.Type) =>
+      Effect.gen(function* () {
+        const service = yield* DispatchService;
+        return yield* service.channelListConfig(request.payload);
+      }),
+  },
+  channelSet: {
+    operation: "channelSet",
+    workflow: DispatchChannelSetWorkflow,
+    getInteractionToken: (request: typeof DispatchChannelSetWorkflow.payloadSchema.Type) =>
+      request.payload.interactionToken,
+    authorize: (request: typeof DispatchChannelSetWorkflow.payloadSchema.Type) =>
+      requireAuthorizedGuild(request.authorization, request.payload.guildId, "manage"),
+    execute: (request: typeof DispatchChannelSetWorkflow.payloadSchema.Type) =>
+      Effect.gen(function* () {
+        const service = yield* DispatchService;
+        return yield* service.channelSet(request.payload);
+      }),
+  },
+  channelUnset: {
+    operation: "channelUnset",
+    workflow: DispatchChannelUnsetWorkflow,
+    getInteractionToken: (request: typeof DispatchChannelUnsetWorkflow.payloadSchema.Type) =>
+      request.payload.interactionToken,
+    authorize: (request: typeof DispatchChannelUnsetWorkflow.payloadSchema.Type) =>
+      requireAuthorizedGuild(request.authorization, request.payload.guildId, "manage"),
+    execute: (request: typeof DispatchChannelUnsetWorkflow.payloadSchema.Type) =>
+      Effect.gen(function* () {
+        const service = yield* DispatchService;
+        return yield* service.channelUnset(request.payload);
+      }),
+  },
+  serverListConfig: {
+    operation: "serverListConfig",
+    workflow: DispatchServerListConfigWorkflow,
+    getInteractionToken: (request: typeof DispatchServerListConfigWorkflow.payloadSchema.Type) =>
+      request.payload.interactionToken,
+    authorize: (request: typeof DispatchServerListConfigWorkflow.payloadSchema.Type) =>
+      requireAuthorizedGuild(request.authorization, request.payload.guildId, "manage"),
+    execute: (request: typeof DispatchServerListConfigWorkflow.payloadSchema.Type) =>
+      Effect.gen(function* () {
+        const service = yield* DispatchService;
+        return yield* service.serverListConfig(request.payload);
+      }),
+  },
+  serverAddMonitorRole: {
+    operation: "serverAddMonitorRole",
+    workflow: DispatchServerAddMonitorRoleWorkflow,
+    getInteractionToken: (
+      request: typeof DispatchServerAddMonitorRoleWorkflow.payloadSchema.Type,
+    ) => request.payload.interactionToken,
+    authorize: (request: typeof DispatchServerAddMonitorRoleWorkflow.payloadSchema.Type) =>
+      requireAuthorizedGuild(request.authorization, request.payload.guildId, "manage"),
+    execute: (request: typeof DispatchServerAddMonitorRoleWorkflow.payloadSchema.Type) =>
+      Effect.gen(function* () {
+        const service = yield* DispatchService;
+        return yield* service.serverAddMonitorRole(request.payload);
+      }),
+  },
+  serverRemoveMonitorRole: {
+    operation: "serverRemoveMonitorRole",
+    workflow: DispatchServerRemoveMonitorRoleWorkflow,
+    getInteractionToken: (
+      request: typeof DispatchServerRemoveMonitorRoleWorkflow.payloadSchema.Type,
+    ) => request.payload.interactionToken,
+    authorize: (request: typeof DispatchServerRemoveMonitorRoleWorkflow.payloadSchema.Type) =>
+      requireAuthorizedGuild(request.authorization, request.payload.guildId, "manage"),
+    execute: (request: typeof DispatchServerRemoveMonitorRoleWorkflow.payloadSchema.Type) =>
+      Effect.gen(function* () {
+        const service = yield* DispatchService;
+        return yield* service.serverRemoveMonitorRole(request.payload);
+      }),
+  },
+  serverSetSheet: {
+    operation: "serverSetSheet",
+    workflow: DispatchServerSetSheetWorkflow,
+    getInteractionToken: (request: typeof DispatchServerSetSheetWorkflow.payloadSchema.Type) =>
+      request.payload.interactionToken,
+    authorize: (request: typeof DispatchServerSetSheetWorkflow.payloadSchema.Type) =>
+      requireAuthorizedGuild(request.authorization, request.payload.guildId, "manage"),
+    execute: (request: typeof DispatchServerSetSheetWorkflow.payloadSchema.Type) =>
+      Effect.gen(function* () {
+        const service = yield* DispatchService;
+        return yield* service.serverSetSheet(request.payload);
+      }),
+  },
+  serverSetAutoCheckin: {
+    operation: "serverSetAutoCheckin",
+    workflow: DispatchServerSetAutoCheckinWorkflow,
+    getInteractionToken: (
+      request: typeof DispatchServerSetAutoCheckinWorkflow.payloadSchema.Type,
+    ) => request.payload.interactionToken,
+    authorize: (request: typeof DispatchServerSetAutoCheckinWorkflow.payloadSchema.Type) =>
+      requireAuthorizedGuild(request.authorization, request.payload.guildId, "manage"),
+    execute: (request: typeof DispatchServerSetAutoCheckinWorkflow.payloadSchema.Type) =>
+      Effect.gen(function* () {
+        const service = yield* DispatchService;
+        return yield* service.serverSetAutoCheckin(request.payload);
+      }),
+  },
+  teamList: {
+    operation: "teamList",
+    workflow: DispatchTeamListWorkflow,
+    getInteractionToken: (request: typeof DispatchTeamListWorkflow.payloadSchema.Type) =>
+      request.payload.interactionToken,
+    authorize: (request: typeof DispatchTeamListWorkflow.payloadSchema.Type) =>
+      requireSelfOrAuthorizedGuild(request, "monitor"),
+    execute: (request: typeof DispatchTeamListWorkflow.payloadSchema.Type) =>
+      Effect.gen(function* () {
+        const service = yield* DispatchService;
+        return yield* service.teamList(request.payload);
+      }),
+  },
+  scheduleList: {
+    operation: "scheduleList",
+    workflow: DispatchScheduleListWorkflow,
+    getInteractionToken: (request: typeof DispatchScheduleListWorkflow.payloadSchema.Type) =>
+      request.payload.interactionToken,
+    authorize: (request: typeof DispatchScheduleListWorkflow.payloadSchema.Type) =>
+      requireSelfOrAuthorizedGuild(request, "monitor"),
+    execute: (request: typeof DispatchScheduleListWorkflow.payloadSchema.Type) =>
+      Effect.gen(function* () {
+        const service = yield* DispatchService;
+        return yield* service.scheduleList(request.payload);
+      }),
+  },
+  screenshot: {
+    operation: "screenshot",
+    workflow: DispatchScreenshotWorkflow,
+    getInteractionToken: (request: typeof DispatchScreenshotWorkflow.payloadSchema.Type) =>
+      request.payload.interactionToken,
+    authorize: (request: typeof DispatchScreenshotWorkflow.payloadSchema.Type) =>
+      requireAuthorizedGuild(request.authorization, request.payload.guildId, "monitor"),
+    execute: (request: typeof DispatchScreenshotWorkflow.payloadSchema.Type) =>
+      Effect.gen(function* () {
+        const service = yield* DispatchService;
+        return yield* service.screenshot(request.payload);
+      }),
+  },
 } as const;
 
 export const dispatchWorkflowLayer = Layer.mergeAll(
@@ -488,6 +684,61 @@ export const dispatchWorkflowLayer = Layer.mergeAll(
   DispatchRoomOrderPinTentativeButtonWorkflow.toLayer(
     makeWorkflowHandler({
       ...dispatchWorkflowRegistry.roomOrderPinTentativeButton,
+    }),
+  ),
+  DispatchChannelListConfigWorkflow.toLayer(
+    makeWorkflowHandler({
+      ...dispatchWorkflowRegistry.channelListConfig,
+    }),
+  ),
+  DispatchChannelSetWorkflow.toLayer(
+    makeWorkflowHandler({
+      ...dispatchWorkflowRegistry.channelSet,
+    }),
+  ),
+  DispatchChannelUnsetWorkflow.toLayer(
+    makeWorkflowHandler({
+      ...dispatchWorkflowRegistry.channelUnset,
+    }),
+  ),
+  DispatchServerListConfigWorkflow.toLayer(
+    makeWorkflowHandler({
+      ...dispatchWorkflowRegistry.serverListConfig,
+    }),
+  ),
+  DispatchServerAddMonitorRoleWorkflow.toLayer(
+    makeWorkflowHandler({
+      ...dispatchWorkflowRegistry.serverAddMonitorRole,
+    }),
+  ),
+  DispatchServerRemoveMonitorRoleWorkflow.toLayer(
+    makeWorkflowHandler({
+      ...dispatchWorkflowRegistry.serverRemoveMonitorRole,
+    }),
+  ),
+  DispatchServerSetSheetWorkflow.toLayer(
+    makeWorkflowHandler({
+      ...dispatchWorkflowRegistry.serverSetSheet,
+    }),
+  ),
+  DispatchServerSetAutoCheckinWorkflow.toLayer(
+    makeWorkflowHandler({
+      ...dispatchWorkflowRegistry.serverSetAutoCheckin,
+    }),
+  ),
+  DispatchTeamListWorkflow.toLayer(
+    makeWorkflowHandler({
+      ...dispatchWorkflowRegistry.teamList,
+    }),
+  ),
+  DispatchScheduleListWorkflow.toLayer(
+    makeWorkflowHandler({
+      ...dispatchWorkflowRegistry.scheduleList,
+    }),
+  ),
+  DispatchScreenshotWorkflow.toLayer(
+    makeWorkflowHandler({
+      ...dispatchWorkflowRegistry.screenshot,
     }),
   ),
 ).pipe(Layer.provide([DispatchService.layer, IngressBotClient.layer, SheetApisClient.layer]));

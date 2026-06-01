@@ -66,6 +66,23 @@ export const SlotDispatchError = Schema.Union(SlotDispatchErrorSchemas);
 export const GuildWelcomeDispatchErrorSchemas = [ArgumentError, UnknownError] as const;
 export const GuildWelcomeDispatchError = Schema.Union(GuildWelcomeDispatchErrorSchemas);
 
+export const BotCommandDispatchErrorSchemas = [
+  GoogleSheetsError,
+  ParserFieldError,
+  SheetConfigError,
+  SchemaError,
+  QueryResultError,
+  ArgumentError,
+  UnknownError,
+] as const;
+export const BotCommandDispatchError = Schema.Union(BotCommandDispatchErrorSchemas);
+
+const CommandDispatchPayloadBase = {
+  dispatchRequestId: Schema.String,
+  interactionToken: Schema.String,
+  interactionDeadlineEpochMs: Schema.Number,
+} as const;
+
 export const CheckinDispatchPayload = Schema.Struct({
   dispatchRequestId: Schema.String,
   guildId: Schema.String,
@@ -239,6 +256,196 @@ export const GuildWelcomeDispatchResult = Schema.Struct({
 
 export type GuildWelcomeDispatchResult = Schema.Schema.Type<typeof GuildWelcomeDispatchResult>;
 
+export const ChannelListConfigDispatchPayload = Schema.Struct({
+  ...CommandDispatchPayloadBase,
+  guildId: Schema.String,
+  channelId: Schema.String,
+});
+
+export type ChannelListConfigDispatchPayload = Schema.Schema.Type<
+  typeof ChannelListConfigDispatchPayload
+>;
+
+export const ChannelListConfigDispatchResult = Schema.Struct({
+  guildId: Schema.String,
+  channelId: Schema.String,
+});
+
+export type ChannelListConfigDispatchResult = Schema.Schema.Type<
+  typeof ChannelListConfigDispatchResult
+>;
+
+export const ChannelSetDispatchPayload = Schema.Struct({
+  ...CommandDispatchPayloadBase,
+  guildId: Schema.String,
+  channelId: Schema.String,
+  running: Schema.optional(Schema.Boolean),
+  name: Schema.optional(Schema.String),
+  roleId: Schema.optional(Schema.String),
+  checkinChannelId: Schema.optional(Schema.String),
+});
+
+export type ChannelSetDispatchPayload = Schema.Schema.Type<typeof ChannelSetDispatchPayload>;
+
+export const ChannelSetDispatchResult = Schema.Struct({
+  guildId: Schema.String,
+  channelId: Schema.String,
+});
+
+export type ChannelSetDispatchResult = Schema.Schema.Type<typeof ChannelSetDispatchResult>;
+
+export const ChannelUnsetDispatchPayload = Schema.Struct({
+  ...CommandDispatchPayloadBase,
+  guildId: Schema.String,
+  channelId: Schema.String,
+  running: Schema.optional(Schema.Boolean),
+  name: Schema.optional(Schema.Boolean),
+  role: Schema.optional(Schema.Boolean),
+  checkinChannel: Schema.optional(Schema.Boolean),
+});
+
+export type ChannelUnsetDispatchPayload = Schema.Schema.Type<typeof ChannelUnsetDispatchPayload>;
+
+export const ChannelUnsetDispatchResult = ChannelSetDispatchResult;
+export type ChannelUnsetDispatchResult = Schema.Schema.Type<typeof ChannelUnsetDispatchResult>;
+
+export const ServerListConfigDispatchPayload = Schema.Struct({
+  ...CommandDispatchPayloadBase,
+  guildId: Schema.String,
+});
+
+export type ServerListConfigDispatchPayload = Schema.Schema.Type<
+  typeof ServerListConfigDispatchPayload
+>;
+
+export const ServerListConfigDispatchResult = Schema.Struct({
+  guildId: Schema.String,
+  monitorRoleCount: Schema.Number,
+});
+
+export type ServerListConfigDispatchResult = Schema.Schema.Type<
+  typeof ServerListConfigDispatchResult
+>;
+
+export const ServerAddMonitorRoleDispatchPayload = Schema.Struct({
+  ...CommandDispatchPayloadBase,
+  guildId: Schema.String,
+  roleId: Schema.String,
+});
+
+export type ServerAddMonitorRoleDispatchPayload = Schema.Schema.Type<
+  typeof ServerAddMonitorRoleDispatchPayload
+>;
+
+export const ServerAddMonitorRoleDispatchResult = Schema.Struct({
+  guildId: Schema.String,
+  roleId: Schema.String,
+});
+
+export type ServerAddMonitorRoleDispatchResult = Schema.Schema.Type<
+  typeof ServerAddMonitorRoleDispatchResult
+>;
+
+export const ServerRemoveMonitorRoleDispatchPayload = ServerAddMonitorRoleDispatchPayload;
+export type ServerRemoveMonitorRoleDispatchPayload = Schema.Schema.Type<
+  typeof ServerRemoveMonitorRoleDispatchPayload
+>;
+
+export const ServerRemoveMonitorRoleDispatchResult = ServerAddMonitorRoleDispatchResult;
+export type ServerRemoveMonitorRoleDispatchResult = Schema.Schema.Type<
+  typeof ServerRemoveMonitorRoleDispatchResult
+>;
+
+export const ServerSetSheetDispatchPayload = Schema.Struct({
+  ...CommandDispatchPayloadBase,
+  guildId: Schema.String,
+  sheetId: Schema.String,
+});
+
+export type ServerSetSheetDispatchPayload = Schema.Schema.Type<
+  typeof ServerSetSheetDispatchPayload
+>;
+
+export const ServerSetSheetDispatchResult = Schema.Struct({
+  guildId: Schema.String,
+  sheetId: Schema.String,
+});
+
+export type ServerSetSheetDispatchResult = Schema.Schema.Type<typeof ServerSetSheetDispatchResult>;
+
+export const ServerSetAutoCheckinDispatchPayload = Schema.Struct({
+  ...CommandDispatchPayloadBase,
+  guildId: Schema.String,
+  autoCheckin: Schema.Boolean,
+});
+
+export type ServerSetAutoCheckinDispatchPayload = Schema.Schema.Type<
+  typeof ServerSetAutoCheckinDispatchPayload
+>;
+
+export const ServerSetAutoCheckinDispatchResult = Schema.Struct({
+  guildId: Schema.String,
+  autoCheckin: Schema.Boolean,
+});
+
+export type ServerSetAutoCheckinDispatchResult = Schema.Schema.Type<
+  typeof ServerSetAutoCheckinDispatchResult
+>;
+
+export const TeamListDispatchPayload = Schema.Struct({
+  ...CommandDispatchPayloadBase,
+  guildId: Schema.String,
+  targetUserId: Schema.String,
+  targetUsername: Schema.String,
+});
+
+export type TeamListDispatchPayload = Schema.Schema.Type<typeof TeamListDispatchPayload>;
+
+export const TeamListDispatchResult = Schema.Struct({
+  guildId: Schema.String,
+  targetUserId: Schema.String,
+  teamCount: Schema.Number,
+});
+
+export type TeamListDispatchResult = Schema.Schema.Type<typeof TeamListDispatchResult>;
+
+export const ScheduleListDispatchPayload = Schema.Struct({
+  ...CommandDispatchPayloadBase,
+  guildId: Schema.String,
+  day: Schema.Number,
+  targetUserId: Schema.String,
+  targetUsername: Schema.String,
+});
+
+export type ScheduleListDispatchPayload = Schema.Schema.Type<typeof ScheduleListDispatchPayload>;
+
+export const ScheduleListDispatchResult = Schema.Struct({
+  guildId: Schema.String,
+  day: Schema.Number,
+  targetUserId: Schema.String,
+  invisible: Schema.Boolean,
+});
+
+export type ScheduleListDispatchResult = Schema.Schema.Type<typeof ScheduleListDispatchResult>;
+
+export const ScreenshotDispatchPayload = Schema.Struct({
+  ...CommandDispatchPayloadBase,
+  guildId: Schema.String,
+  channelName: Schema.String,
+  day: Schema.Number,
+});
+
+export type ScreenshotDispatchPayload = Schema.Schema.Type<typeof ScreenshotDispatchPayload>;
+
+export const ScreenshotDispatchResult = Schema.Struct({
+  guildId: Schema.String,
+  channelName: Schema.String,
+  day: Schema.Number,
+  byteLength: Schema.Number,
+});
+
+export type ScreenshotDispatchResult = Schema.Schema.Type<typeof ScreenshotDispatchResult>;
+
 export const ServiceStatusDispatchResult = Schema.Struct({
   overallStatus: Schema.Literals(["ok", "degraded"]),
   okCount: Schema.Number,
@@ -286,6 +493,17 @@ export const DispatchAcceptedResult = Schema.Struct({
     "roomOrderNextButton",
     "roomOrderSendButton",
     "roomOrderPinTentativeButton",
+    "channelListConfig",
+    "channelSet",
+    "channelUnset",
+    "serverListConfig",
+    "serverAddMonitorRole",
+    "serverRemoveMonitorRole",
+    "serverSetSheet",
+    "serverSetAutoCheckin",
+    "teamList",
+    "scheduleList",
+    "screenshot",
   ]),
   status: Schema.Literal("accepted"),
 });

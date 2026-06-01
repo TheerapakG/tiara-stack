@@ -4,6 +4,10 @@ import {
   CheckinDispatchErrorSchemas,
   CheckinDispatchPayload,
   DispatchAcceptedResult,
+  BotCommandDispatchErrorSchemas,
+  ChannelListConfigDispatchPayload,
+  ChannelSetDispatchPayload,
+  ChannelUnsetDispatchPayload,
   CheckinHandleButtonErrorSchemas,
   CheckinHandleButtonPayload,
   DispatchRoomOrderButtonMethods,
@@ -18,11 +22,19 @@ import {
   RoomOrderPinTentativeButtonPayload,
   RoomOrderPreviousButtonPayload,
   RoomOrderSendButtonPayload,
+  ScheduleListDispatchPayload,
   ServiceStatusDispatchPayload,
+  ServerAddMonitorRoleDispatchPayload,
+  ServerListConfigDispatchPayload,
+  ServerRemoveMonitorRoleDispatchPayload,
+  ServerSetAutoCheckinDispatchPayload,
+  ServerSetSheetDispatchPayload,
+  ScreenshotDispatchPayload,
   SlotButtonDispatchPayload,
   SlotDispatchErrorSchemas,
   SlotListDispatchPayload,
   SlotOpenButtonPayload,
+  TeamListDispatchPayload,
 } from "./schema";
 import { UnknownError } from "typhoon-core/error";
 
@@ -88,6 +100,83 @@ export class DispatchApi extends HttpApiGroup.make("dispatch")
       payload: GuildWelcomeDispatchPayload,
       success: DispatchAcceptedResult,
       error: GuildWelcomeDispatchErrorSchemas,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("channelListConfig", "/dispatch/channel/list-config", {
+      payload: ChannelListConfigDispatchPayload,
+      success: DispatchAcceptedResult,
+      error: BotCommandDispatchErrorSchemas,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("channelSet", "/dispatch/channel/set", {
+      payload: ChannelSetDispatchPayload,
+      success: DispatchAcceptedResult,
+      error: BotCommandDispatchErrorSchemas,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("channelUnset", "/dispatch/channel/unset", {
+      payload: ChannelUnsetDispatchPayload,
+      success: DispatchAcceptedResult,
+      error: BotCommandDispatchErrorSchemas,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("serverListConfig", "/dispatch/server/list-config", {
+      payload: ServerListConfigDispatchPayload,
+      success: DispatchAcceptedResult,
+      error: BotCommandDispatchErrorSchemas,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("serverAddMonitorRole", "/dispatch/server/add/monitor-role", {
+      payload: ServerAddMonitorRoleDispatchPayload,
+      success: DispatchAcceptedResult,
+      error: BotCommandDispatchErrorSchemas,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("serverRemoveMonitorRole", "/dispatch/server/remove/monitor-role", {
+      payload: ServerRemoveMonitorRoleDispatchPayload,
+      success: DispatchAcceptedResult,
+      error: BotCommandDispatchErrorSchemas,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("serverSetSheet", "/dispatch/server/set/sheet", {
+      payload: ServerSetSheetDispatchPayload,
+      success: DispatchAcceptedResult,
+      error: BotCommandDispatchErrorSchemas,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("serverSetAutoCheckin", "/dispatch/server/set/auto-checkin", {
+      payload: ServerSetAutoCheckinDispatchPayload,
+      success: DispatchAcceptedResult,
+      error: BotCommandDispatchErrorSchemas,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("teamList", "/dispatch/team/list", {
+      payload: TeamListDispatchPayload,
+      success: DispatchAcceptedResult,
+      error: BotCommandDispatchErrorSchemas,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("scheduleList", "/dispatch/schedule/list", {
+      payload: ScheduleListDispatchPayload,
+      success: DispatchAcceptedResult,
+      error: BotCommandDispatchErrorSchemas,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("screenshot", "/dispatch/screenshot", {
+      payload: ScreenshotDispatchPayload,
+      success: DispatchAcceptedResult,
+      error: BotCommandDispatchErrorSchemas,
     }),
   )
   .add(

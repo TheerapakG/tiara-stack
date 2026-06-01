@@ -2,17 +2,34 @@ import { describe, expect, it } from "vitest";
 import { Cause, DateTime, Effect, Exit, Option } from "effect";
 import { TestClock } from "effect/testing";
 import type {
+  ChannelListConfigDispatchPayload,
+  ChannelSetDispatchPayload,
+  ChannelUnsetDispatchPayload,
   GuildWelcomeDispatchPayload,
   KickoutDispatchPayload,
+  ScheduleListDispatchPayload,
+  ServerAddMonitorRoleDispatchPayload,
+  ServerListConfigDispatchPayload,
+  ServerRemoveMonitorRoleDispatchPayload,
+  ServerSetAutoCheckinDispatchPayload,
+  ServerSetSheetDispatchPayload,
+  ScreenshotDispatchPayload,
   ServiceStatusDispatchPayload,
   SlotButtonDispatchPayload,
   SlotOpenButtonPayload,
+  TeamListDispatchPayload,
 } from "sheet-ingress-api/handlers/dispatch/schema";
+import {
+  GuildChannelConfig,
+  GuildConfig,
+  GuildConfigMonitorRole,
+} from "sheet-ingress-api/schemas/guildConfig";
 import { MessageSlot } from "sheet-ingress-api/schemas/messageSlot";
 import {
   Player,
   PopulatedSchedule,
   PopulatedSchedulePlayer,
+  Team,
 } from "sheet-ingress-api/schemas/sheet";
 import { EventConfig } from "sheet-ingress-api/schemas/sheetConfig";
 import { DispatchService, IngressBotClient, SheetApisClient } from "@/services";
@@ -44,6 +61,27 @@ const serviceStatusPayload: ServiceStatusDispatchPayload = {
   dispatchRequestId: "dispatch-service-status",
   interactionToken: "interaction-token",
   interactionDeadlineEpochMs: 1_700_000_000_000,
+};
+
+const screenshotPayload: ScreenshotDispatchPayload = {
+  dispatchRequestId: "dispatch-screenshot",
+  guildId: "guild-1",
+  channelName: "main",
+  day: 2,
+  interactionToken: "interaction-token",
+  interactionDeadlineEpochMs: 1_700_000_000_000,
+};
+
+const commandBase = {
+  interactionToken: "interaction-token",
+  interactionDeadlineEpochMs: 1_700_000_000_000,
+};
+
+const channelConfigPayload = {
+  ...commandBase,
+  dispatchRequestId: "dispatch-channel-config",
+  guildId: "guild-1",
+  channelId: "channel-1",
 };
 
 const messageSlot = new MessageSlot({
@@ -166,6 +204,68 @@ const runGuildWelcome = (
     Effect.provideService(IngressBotClient, botClient),
     Effect.provideService(SheetApisClient, sheetApisClient),
   );
+
+const runScreenshot = (
+  botClient: typeof IngressBotClient.Service,
+  sheetApisClient: typeof SheetApisClient.Service,
+) =>
+  Effect.gen(function* () {
+    const service = yield* DispatchService.make;
+    return yield* service.screenshot(screenshotPayload);
+  }).pipe(
+    Effect.provideService(IngressBotClient, botClient),
+    Effect.provideService(SheetApisClient, sheetApisClient),
+  );
+
+const runWithDispatchService = <A>(
+  botClient: typeof IngressBotClient.Service,
+  sheetApisClient: typeof SheetApisClient.Service,
+  f: (service: typeof DispatchService.Service) => Effect.Effect<A, unknown>,
+) =>
+  Effect.gen(function* () {
+    const service = yield* DispatchService.make;
+    return yield* f(service);
+  }).pipe(
+    Effect.provideService(IngressBotClient, botClient),
+    Effect.provideService(SheetApisClient, sheetApisClient),
+  );
+
+const makeInteractionUpdateBotClient = (
+  updateCalls: Array<{ readonly interactionToken: string; readonly payload: unknown }>,
+) =>
+  ({
+    updateOriginalInteractionResponse: (interactionToken: string, payload: unknown) => {
+      updateCalls.push({ interactionToken, payload });
+      return Effect.succeed({ id: "message-1", channel_id: "channel-1" });
+    },
+  }) as never;
+
+const makeGuildChannelConfig = (
+  overrides: Partial<ConstructorParameters<typeof GuildChannelConfig>[0]> = {},
+) =>
+  new GuildChannelConfig({
+    guildId: "guild-1",
+    channelId: "channel-1",
+    name: Option.some("main"),
+    running: Option.some(true),
+    roleId: Option.some("role-1"),
+    checkinChannelId: Option.some("checkin-channel-1"),
+    createdAt: Option.none(),
+    updatedAt: Option.none(),
+    deletedAt: Option.none(),
+    ...overrides,
+  });
+
+const makeGuildConfig = (overrides: Partial<ConstructorParameters<typeof GuildConfig>[0]> = {}) =>
+  new GuildConfig({
+    guildId: "guild-1",
+    sheetId: Option.some("sheet-1"),
+    autoCheckin: Option.some(true),
+    createdAt: Option.none(),
+    updatedAt: Option.none(),
+    deletedAt: Option.none(),
+    ...overrides,
+  });
 
 const makeChannelEntry = (overrides: {
   readonly id: string;
@@ -793,6 +893,525 @@ describe("DispatchService", () => {
           content: "Kicked out <@member-3>",
           allowed_mentions: { parse: [] },
         },
+      },
+    ]);
+  });
+
+  it("lists channel config with formatted fields", async () => {
+    const updateCalls: Array<{ readonly interactionToken: string; readonly payload: unknown }> = [];
+    const sheetApiCalls: Array<unknown> = [];
+    const sheetApisClient = makeSheetApisClient({
+      guildConfig: {
+        getGuildChannelById: (args: unknown) => {
+          sheetApiCalls.push(args);
+          return Effect.succeed(makeGuildChannelConfig());
+        },
+      },
+    });
+
+    const result = await Effect.runPromise(
+      runWithDispatchService(
+        makeInteractionUpdateBotClient(updateCalls),
+        sheetApisClient,
+        (service) =>
+          service.channelListConfig({
+            ...channelConfigPayload,
+            dispatchRequestId: "dispatch-channel-list-config",
+          } satisfies ChannelListConfigDispatchPayload),
+      ),
+    );
+
+    expect(result).toEqual({ guildId: "guild-1", channelId: "channel-1" });
+    expect(sheetApiCalls).toEqual([{ query: { guildId: "guild-1", channelId: "channel-1" } }]);
+    expect(updateCalls).toEqual([
+      {
+        interactionToken: "interaction-token",
+        payload: {
+          embeds: [
+            {
+              title: "Config for this channel",
+              fields: [
+                { name: "Name", value: "main" },
+                { name: "Running channel", value: "Yes" },
+                { name: "Role", value: "<@&role-1>" },
+                { name: "Checkin channel", value: "<#checkin-channel-1>" },
+              ],
+            },
+          ],
+        },
+      },
+    ]);
+  });
+
+  it("updates channel config and returns the channel result", async () => {
+    const updateCalls: Array<{ readonly interactionToken: string; readonly payload: unknown }> = [];
+    const sheetApiCalls: Array<unknown> = [];
+    const sheetApisClient = makeSheetApisClient({
+      guildConfig: {
+        upsertGuildChannelConfig: (args: unknown) => {
+          sheetApiCalls.push(args);
+          return Effect.succeed(makeGuildChannelConfig({ name: Option.some("side") }));
+        },
+      },
+    });
+
+    const result = await Effect.runPromise(
+      runWithDispatchService(
+        makeInteractionUpdateBotClient(updateCalls),
+        sheetApisClient,
+        (service) =>
+          service.channelSet({
+            ...channelConfigPayload,
+            dispatchRequestId: "dispatch-channel-set",
+            running: false,
+            name: "side",
+            roleId: "role-2",
+            checkinChannelId: "checkin-channel-2",
+          } satisfies ChannelSetDispatchPayload),
+      ),
+    );
+
+    expect(result).toEqual({ guildId: "guild-1", channelId: "channel-1" });
+    expect(sheetApiCalls).toEqual([
+      {
+        payload: {
+          guildId: "guild-1",
+          channelId: "channel-1",
+          config: {
+            running: false,
+            name: "side",
+            roleId: "role-2",
+            checkinChannelId: "checkin-channel-2",
+          },
+        },
+      },
+    ]);
+    expect(updateCalls[0]?.payload).toMatchObject({
+      embeds: [
+        {
+          title: "Success!",
+          description: "<#channel-1> configuration updated",
+          fields: expect.arrayContaining([{ name: "Name", value: "side" }]),
+        },
+      ],
+    });
+  });
+
+  it("unsets channel config fields", async () => {
+    const updateCalls: Array<{ readonly interactionToken: string; readonly payload: unknown }> = [];
+    const sheetApiCalls: Array<unknown> = [];
+    const sheetApisClient = makeSheetApisClient({
+      guildConfig: {
+        upsertGuildChannelConfig: (args: unknown) => {
+          sheetApiCalls.push(args);
+          return Effect.succeed(
+            makeGuildChannelConfig({
+              name: Option.none(),
+              running: Option.none(),
+              roleId: Option.none(),
+              checkinChannelId: Option.none(),
+            }),
+          );
+        },
+      },
+    });
+
+    const result = await Effect.runPromise(
+      runWithDispatchService(
+        makeInteractionUpdateBotClient(updateCalls),
+        sheetApisClient,
+        (service) =>
+          service.channelUnset({
+            ...channelConfigPayload,
+            dispatchRequestId: "dispatch-channel-unset",
+            running: true,
+            name: true,
+            role: true,
+            checkinChannel: true,
+          } satisfies ChannelUnsetDispatchPayload),
+      ),
+    );
+
+    expect(result).toEqual({ guildId: "guild-1", channelId: "channel-1" });
+    expect(sheetApiCalls).toEqual([
+      {
+        payload: {
+          guildId: "guild-1",
+          channelId: "channel-1",
+          config: {
+            running: null,
+            name: null,
+            roleId: null,
+            checkinChannelId: null,
+          },
+        },
+      },
+    ]);
+    expect(updateCalls[0]?.payload).toMatchObject({
+      embeds: [{ fields: expect.arrayContaining([{ name: "Name", value: "None!" }]) }],
+    });
+  });
+
+  it("lists server config with monitor role mentions", async () => {
+    const updateCalls: Array<{ readonly interactionToken: string; readonly payload: unknown }> = [];
+    const sheetApiCalls: Array<unknown> = [];
+    const sheetApisClient = makeSheetApisClient({
+      guildConfig: {
+        getGuildConfig: (args: unknown) => {
+          sheetApiCalls.push(["getGuildConfig", args]);
+          return Effect.succeed(makeGuildConfig());
+        },
+        getGuildMonitorRoles: (args: unknown) => {
+          sheetApiCalls.push(["getGuildMonitorRoles", args]);
+          return Effect.succeed([
+            new GuildConfigMonitorRole({
+              guildId: "guild-1",
+              roleId: "role-1",
+              createdAt: Option.none(),
+              updatedAt: Option.none(),
+              deletedAt: Option.none(),
+            }),
+          ]);
+        },
+      },
+    });
+
+    const result = await Effect.runPromise(
+      runWithDispatchService(
+        makeInteractionUpdateBotClient(updateCalls),
+        sheetApisClient,
+        (service) =>
+          service.serverListConfig({
+            ...commandBase,
+            dispatchRequestId: "dispatch-server-list-config",
+            guildId: "guild-1",
+          } satisfies ServerListConfigDispatchPayload),
+      ),
+    );
+
+    expect(result).toEqual({ guildId: "guild-1", monitorRoleCount: 1 });
+    expect(sheetApiCalls).toEqual([
+      ["getGuildConfig", { query: { guildId: "guild-1" } }],
+      ["getGuildMonitorRoles", { query: { guildId: "guild-1" } }],
+    ]);
+    expect(updateCalls[0]?.payload).toMatchObject({
+      embeds: [
+        {
+          title: "Config for guild-1",
+          description: "Sheet id: sheet-1\nAuto check-in: Enabled\nMonitor roles: <@&role-1>",
+        },
+      ],
+    });
+  });
+
+  it("adds a server monitor role", async () => {
+    const updateCalls: Array<{ readonly interactionToken: string; readonly payload: unknown }> = [];
+    const sheetApiCalls: Array<unknown> = [];
+    const sheetApisClient = makeSheetApisClient({
+      guildConfig: {
+        addGuildMonitorRole: (args: unknown) => {
+          sheetApiCalls.push(args);
+          return Effect.succeed({});
+        },
+      },
+    });
+
+    const result = await Effect.runPromise(
+      runWithDispatchService(
+        makeInteractionUpdateBotClient(updateCalls),
+        sheetApisClient,
+        (service) =>
+          service.serverAddMonitorRole({
+            ...commandBase,
+            dispatchRequestId: "dispatch-server-add-monitor-role",
+            guildId: "guild-1",
+            roleId: "role-1",
+          } satisfies ServerAddMonitorRoleDispatchPayload),
+      ),
+    );
+
+    expect(result).toEqual({ guildId: "guild-1", roleId: "role-1" });
+    expect(sheetApiCalls).toEqual([{ payload: { guildId: "guild-1", roleId: "role-1" } }]);
+    expect(updateCalls[0]?.payload).toMatchObject({
+      embeds: [{ description: "<@&role-1> is now a monitor role for guild-1" }],
+    });
+  });
+
+  it("removes a server monitor role", async () => {
+    const updateCalls: Array<{ readonly interactionToken: string; readonly payload: unknown }> = [];
+    const sheetApiCalls: Array<unknown> = [];
+    const sheetApisClient = makeSheetApisClient({
+      guildConfig: {
+        removeGuildMonitorRole: (args: unknown) => {
+          sheetApiCalls.push(args);
+          return Effect.succeed({});
+        },
+      },
+    });
+
+    const result = await Effect.runPromise(
+      runWithDispatchService(
+        makeInteractionUpdateBotClient(updateCalls),
+        sheetApisClient,
+        (service) =>
+          service.serverRemoveMonitorRole({
+            ...commandBase,
+            dispatchRequestId: "dispatch-server-remove-monitor-role",
+            guildId: "guild-1",
+            roleId: "role-1",
+          } satisfies ServerRemoveMonitorRoleDispatchPayload),
+      ),
+    );
+
+    expect(result).toEqual({ guildId: "guild-1", roleId: "role-1" });
+    expect(sheetApiCalls).toEqual([{ payload: { guildId: "guild-1", roleId: "role-1" } }]);
+    expect(updateCalls[0]?.payload).toMatchObject({
+      embeds: [{ description: "<@&role-1> is no longer a monitor role for guild-1" }],
+    });
+  });
+
+  it("sets the server sheet id", async () => {
+    const updateCalls: Array<{ readonly interactionToken: string; readonly payload: unknown }> = [];
+    const sheetApiCalls: Array<unknown> = [];
+    const sheetApisClient = makeSheetApisClient({
+      guildConfig: {
+        upsertGuildConfig: (args: unknown) => {
+          sheetApiCalls.push(args);
+          return Effect.succeed(makeGuildConfig({ sheetId: Option.some("sheet-2") }));
+        },
+      },
+    });
+
+    const result = await Effect.runPromise(
+      runWithDispatchService(
+        makeInteractionUpdateBotClient(updateCalls),
+        sheetApisClient,
+        (service) =>
+          service.serverSetSheet({
+            ...commandBase,
+            dispatchRequestId: "dispatch-server-set-sheet",
+            guildId: "guild-1",
+            sheetId: "sheet-2",
+          } satisfies ServerSetSheetDispatchPayload),
+      ),
+    );
+
+    expect(result).toEqual({ guildId: "guild-1", sheetId: "sheet-2" });
+    expect(sheetApiCalls).toEqual([
+      { payload: { guildId: "guild-1", config: { sheetId: "sheet-2" } } },
+    ]);
+    expect(updateCalls[0]?.payload).toMatchObject({
+      embeds: [{ description: "Sheet id for guild-1 is now set to sheet-2" }],
+    });
+  });
+
+  it("sets server auto check-in", async () => {
+    const updateCalls: Array<{ readonly interactionToken: string; readonly payload: unknown }> = [];
+    const sheetApiCalls: Array<unknown> = [];
+    const sheetApisClient = makeSheetApisClient({
+      guildConfig: {
+        upsertGuildConfig: (args: unknown) => {
+          sheetApiCalls.push(args);
+          return Effect.succeed(makeGuildConfig({ autoCheckin: Option.some(false) }));
+        },
+      },
+    });
+
+    const result = await Effect.runPromise(
+      runWithDispatchService(
+        makeInteractionUpdateBotClient(updateCalls),
+        sheetApisClient,
+        (service) =>
+          service.serverSetAutoCheckin({
+            ...commandBase,
+            dispatchRequestId: "dispatch-server-set-auto-checkin",
+            guildId: "guild-1",
+            autoCheckin: false,
+          } satisfies ServerSetAutoCheckinDispatchPayload),
+      ),
+    );
+
+    expect(result).toEqual({ guildId: "guild-1", autoCheckin: false });
+    expect(sheetApiCalls).toEqual([
+      { payload: { guildId: "guild-1", config: { autoCheckin: false } } },
+    ]);
+    expect(updateCalls[0]?.payload).toMatchObject({
+      embeds: [{ description: "Auto check-in for guild-1 is now disabled." }],
+    });
+  });
+
+  it("formats a user's team list", async () => {
+    const updateCalls: Array<{ readonly interactionToken: string; readonly payload: unknown }> = [];
+    const sheetApiCalls: Array<unknown> = [];
+    const sheetApisClient = makeSheetApisClient({
+      player: {
+        getTeamsByIds: (args: unknown) => {
+          sheetApiCalls.push(args);
+          return Effect.succeed([
+            [
+              new Team({
+                type: "player",
+                playerId: Option.some("user-1"),
+                playerName: Option.some("Alice"),
+                teamName: Option.some("Cool Team"),
+                tags: ["tag1"],
+                lead: 100,
+                backline: 200,
+                talent: Option.some(50),
+              }),
+            ],
+          ]);
+        },
+      },
+    });
+
+    const result = await Effect.runPromise(
+      runWithDispatchService(
+        makeInteractionUpdateBotClient(updateCalls),
+        sheetApisClient,
+        (service) =>
+          service.teamList({
+            ...commandBase,
+            dispatchRequestId: "dispatch-team-list",
+            guildId: "guild-1",
+            targetUserId: "user-1",
+            targetUsername: "Alice",
+          } satisfies TeamListDispatchPayload),
+      ),
+    );
+
+    expect(result).toEqual({ guildId: "guild-1", targetUserId: "user-1", teamCount: 1 });
+    expect(sheetApiCalls).toEqual([{ query: { guildId: "guild-1", ids: ["user-1"] } }]);
+    expect(updateCalls[0]?.payload).toMatchObject({
+      embeds: [
+        {
+          title: "Alice's Teams",
+          fields: [
+            {
+              name: "Cool Team",
+              value: "Tags: tag1\nISV: 100/200/50k (+120%)",
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  it("formats a user's schedule list", async () => {
+    const updateCalls: Array<{ readonly interactionToken: string; readonly payload: unknown }> = [];
+    const sheetApiCalls: Array<unknown> = [];
+    const sheetApisClient = makeSheetApisClient({
+      schedule: {
+        getDayPlayerSchedule: (args: unknown) => {
+          sheetApiCalls.push(args);
+          return Effect.succeed({
+            schedule: {
+              invisible: false,
+              fillHours: [1, 2, 4],
+              overfillHours: [5],
+              standbyHours: [],
+            },
+          });
+        },
+      },
+    });
+
+    const result = await Effect.runPromise(
+      runWithDispatchService(
+        makeInteractionUpdateBotClient(updateCalls),
+        sheetApisClient,
+        (service) =>
+          service.scheduleList({
+            ...commandBase,
+            dispatchRequestId: "dispatch-schedule-list",
+            guildId: "guild-1",
+            day: 2,
+            targetUserId: "user-1",
+            targetUsername: "Alice",
+          } satisfies ScheduleListDispatchPayload),
+      ),
+    );
+
+    expect(result).toEqual({
+      guildId: "guild-1",
+      day: 2,
+      targetUserId: "user-1",
+      invisible: false,
+    });
+    expect(sheetApiCalls).toEqual([
+      { query: { guildId: "guild-1", day: 2, accountId: "user-1", view: "filler" } },
+    ]);
+    expect(updateCalls[0]?.payload).toMatchObject({
+      embeds: [
+        {
+          title: "Alice's Schedule for Day 2",
+          fields: [
+            { name: "Fill", value: "1-2, 4" },
+            { name: "Overfill", value: "5" },
+            { name: "Standby", value: "None" },
+          ],
+        },
+        {
+          description:
+            "📅 **Preview**: View your schedule online at <https://schedule.theerapakg.moe/>",
+        },
+      ],
+    });
+  });
+
+  it("updates screenshot responses with a png file payload", async () => {
+    const screenshot = new Uint8Array([1, 2, 3, 4]);
+    const fileCalls: Array<{
+      readonly interactionToken: string;
+      readonly payload: unknown;
+      readonly files: unknown;
+    }> = [];
+    const botClient = {
+      updateOriginalInteractionResponseWithFiles: (
+        interactionToken: string,
+        payload: unknown,
+        files: unknown,
+      ) => {
+        fileCalls.push({ interactionToken, payload, files });
+        return Effect.succeed({ id: "message-1", channel_id: "channel-1" });
+      },
+    } as never;
+    const sheetApisClient = makeSheetApisClient({
+      screenshot: {
+        getScreenshot: ({ query }: { readonly query: unknown }) => {
+          expect(query).toEqual({ guildId: "guild-1", channel: "main", day: 2 });
+          return Effect.succeed(screenshot);
+        },
+      },
+    });
+
+    const result = await Effect.runPromise(runScreenshot(botClient, sheetApisClient));
+
+    expect(result).toEqual({
+      guildId: "guild-1",
+      channelName: "main",
+      day: 2,
+      byteLength: 4,
+    });
+    expect(fileCalls).toEqual([
+      {
+        interactionToken: "interaction-token",
+        payload: {
+          attachments: [
+            {
+              id: "0",
+              description: "Day 2's schedule screenshot",
+              filename: "screenshot.png",
+            },
+          ],
+        },
+        files: [
+          {
+            name: "screenshot.png",
+            contentType: "image/png",
+            content: screenshot,
+          },
+        ],
       },
     ]);
   });

@@ -79,6 +79,41 @@ export class SheetClusterForwardingClient extends Context.Service<SheetClusterFo
             (args) =>
               rpcClient[DispatchWorkflowOperations.roomOrderPinTentativeButton.discardRpcTag](args),
           ),
+          channelListConfig: accept(DispatchWorkflowOperations.channelListConfig, (args) =>
+            rpcClient[DispatchWorkflowOperations.channelListConfig.discardRpcTag](args),
+          ),
+          channelSet: accept(DispatchWorkflowOperations.channelSet, (args) =>
+            rpcClient[DispatchWorkflowOperations.channelSet.discardRpcTag](args),
+          ),
+          channelUnset: accept(DispatchWorkflowOperations.channelUnset, (args) =>
+            rpcClient[DispatchWorkflowOperations.channelUnset.discardRpcTag](args),
+          ),
+          serverListConfig: accept(DispatchWorkflowOperations.serverListConfig, (args) =>
+            rpcClient[DispatchWorkflowOperations.serverListConfig.discardRpcTag](args),
+          ),
+          serverAddMonitorRole: accept(DispatchWorkflowOperations.serverAddMonitorRole, (args) =>
+            rpcClient[DispatchWorkflowOperations.serverAddMonitorRole.discardRpcTag](args),
+          ),
+          serverRemoveMonitorRole: accept(
+            DispatchWorkflowOperations.serverRemoveMonitorRole,
+            (args) =>
+              rpcClient[DispatchWorkflowOperations.serverRemoveMonitorRole.discardRpcTag](args),
+          ),
+          serverSetSheet: accept(DispatchWorkflowOperations.serverSetSheet, (args) =>
+            rpcClient[DispatchWorkflowOperations.serverSetSheet.discardRpcTag](args),
+          ),
+          serverSetAutoCheckin: accept(DispatchWorkflowOperations.serverSetAutoCheckin, (args) =>
+            rpcClient[DispatchWorkflowOperations.serverSetAutoCheckin.discardRpcTag](args),
+          ),
+          teamList: accept(DispatchWorkflowOperations.teamList, (args) =>
+            rpcClient[DispatchWorkflowOperations.teamList.discardRpcTag](args),
+          ),
+          scheduleList: accept(DispatchWorkflowOperations.scheduleList, (args) =>
+            rpcClient[DispatchWorkflowOperations.scheduleList.discardRpcTag](args),
+          ),
+          screenshot: accept(DispatchWorkflowOperations.screenshot, (args) =>
+            rpcClient[DispatchWorkflowOperations.screenshot.discardRpcTag](args),
+          ),
         },
       };
     }),

@@ -147,6 +147,22 @@ export const UpdateOriginalInteractionResponsePayloadSchema = Schema.Struct({
   payload: DiscordMessageRequestSchema,
 });
 
+// JSON transport file payload. Multipart handlers use Multipart.FilesSchema,
+// whose decoded files are represented by temporary file paths.
+export const DiscordMessageFileBase64PayloadSchema = Schema.Struct({
+  name: Schema.String,
+  contentType: Schema.String,
+  base64: Schema.String,
+});
+
+export const UpdateOriginalInteractionResponseWithFilesPayloadSchema = Schema.Struct({
+  params: Schema.Struct({
+    interactionToken: Schema.String,
+  }),
+  payload: DiscordMessageRequestSchema,
+  files: Schema.Array(DiscordMessageFileBase64PayloadSchema),
+});
+
 export const CreatePinPayloadSchema = Schema.Struct({
   params: Schema.Struct({
     channelId: Schema.String,

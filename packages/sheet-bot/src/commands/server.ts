@@ -1,44 +1,29 @@
-import { escapeMarkdown, roleMention } from "@discordjs/formatters";
 import { InteractionsRegistry } from "dfx/gateway";
 import { Ix } from "dfx/index";
 import { ApplicationIntegrationType, InteractionContextType } from "discord-api-types/v10";
-import { Effect, Layer, Option, Predicate, Result, pipe } from "effect";
-import { GuildsCache } from "dfx-discord-utils/discord/cache";
-import { CommandHelper, Interaction, InteractionResponse } from "dfx-discord-utils/utils";
-import { cachesLayer } from "../discord/cache";
+import { Effect, Layer } from "effect";
+import { CommandHelper, InteractionResponse } from "dfx-discord-utils/utils";
 import { discordGatewayLayer } from "../discord/gateway";
-import { EmbedService, GuildConfigService, SheetApisRequestContext } from "../services";
 import { discordApplicationLayer } from "../discord/application";
+import { SheetClusterClient, SheetClusterRequestContext } from "../services";
+import {
+  makeDispatchBase,
+  requireBoolean,
+  requireResolvedId,
+  requireString,
+  resolveGuildId,
+} from "../utils/commandHelpers";
+import { runSheetClusterDispatch } from "../utils/sheetClusterDispatch";
 
-const getInteractionGuildId = Effect.gen(function* () {
-  const interactionGuild = yield* Interaction.guild();
-  return pipe(
-    interactionGuild,
-    Option.map((guild) => (guild as { id: string }).id),
-  );
-});
-
-const resolveGuildId = Effect.fn("resolveGuildId")(function* (serverId: Option.Option<string>) {
-  const interactionGuildId = yield* getInteractionGuildId;
-
-  return pipe(
-    serverId.pipe(Option.orElse(() => interactionGuildId)),
-    Option.getOrThrowWith(() => new Error("Guild not found in interaction or command options")),
-  );
-});
-
-const isUnauthorized = Predicate.isTagged("Unauthorized");
-
-const isAutoCheckinEnabled = (autoCheckin: Option.Option<boolean>) =>
-  pipe(
-    autoCheckin,
-    Option.getOrElse(() => false),
-  );
+const dispatchServerCommand = <A, E, R>(operation: string, effect: Effect.Effect<A, E, R>) =>
+  Effect.gen(function* () {
+    const response = yield* InteractionResponse;
+    yield* response.deferReply();
+    yield* runSheetClusterDispatch(response, operation, effect);
+  });
 
 const makeListConfigSubCommand = Effect.gen(function* () {
-  const embedService = yield* EmbedService;
-  const guildConfigService = yield* GuildConfigService;
-  const guildsCache = yield* GuildsCache;
+  const sheetClusterClient = yield* SheetClusterClient;
 
   return yield* CommandHelper.makeSubCommand(
     (builder) =>
@@ -49,69 +34,24 @@ const makeListConfigSubCommand = Effect.gen(function* () {
           builder.setName("server_id").setDescription("The server id to list the config for"),
         ),
     Effect.fn("server.list_config")(function* (command) {
-      const response = yield* InteractionResponse;
-      yield* response.deferReply();
-
-      const guildId = yield* resolveGuildId(command.optionValueOptional("server_id"));
-      const guild = yield* guildsCache.get(guildId);
-      const guildConfigResult = yield* Effect.result(
-        Effect.all({
-          guildConfig: guildConfigService.getGuildConfig(guildId),
-          monitorRoles: guildConfigService.getGuildMonitorRoles(guildId),
-        }),
+      const base = yield* makeDispatchBase;
+      yield* dispatchServerCommand(
+        "the server config list",
+        SheetClusterRequestContext.asInteractionUser(() =>
+          Effect.gen(function* () {
+            const guildId = yield* resolveGuildId(command.optionValueOptional("server_id"));
+            return yield* sheetClusterClient.get().dispatch.serverListConfig({
+              payload: { ...base, guildId },
+            });
+          }),
+        )(),
       );
-
-      if (Result.isSuccess(guildConfigResult)) {
-        const { guildConfig, monitorRoles } = guildConfigResult.success;
-        const sheetId = pipe(
-          guildConfig.sheetId,
-          Option.map(escapeMarkdown),
-          Option.getOrElse(() => "None"),
-        );
-
-        yield* response.editReply({
-          payload: {
-            embeds: [
-              (yield* embedService.makeBaseEmbedBuilder())
-                .setTitle(`Config for ${escapeMarkdown(guild.name)}`)
-                .setDescription(
-                  [
-                    `Sheet id: ${sheetId}`,
-                    `Auto check-in: ${
-                      isAutoCheckinEnabled(guildConfig.autoCheckin) ? "Enabled" : "Disabled"
-                    }`,
-                    `Monitor roles: ${
-                      monitorRoles.length > 0
-                        ? monitorRoles
-                            .map((role: { roleId: string }) => roleMention(role.roleId))
-                            .join(", ")
-                        : "None"
-                    }`,
-                  ].join("\n"),
-                )
-                .toJSON(),
-            ],
-          },
-        });
-        return;
-      }
-
-      if (isUnauthorized(guildConfigResult.failure)) {
-        yield* response.editReply({
-          payload: { content: "You need Manage Guild to use this command." },
-        });
-        return;
-      }
-
-      yield* Effect.fail(guildConfigResult.failure);
     }),
   );
 });
 
 const makeAddMonitorRoleSubCommand = Effect.gen(function* () {
-  const embedService = yield* EmbedService;
-  const guildConfigService = yield* GuildConfigService;
-  const guildsCache = yield* GuildsCache;
+  const sheetClusterClient = yield* SheetClusterClient;
 
   return yield* CommandHelper.makeSubCommand(
     (builder) =>
@@ -125,38 +65,19 @@ const makeAddMonitorRoleSubCommand = Effect.gen(function* () {
           builder.setName("server_id").setDescription("The server id to add the monitor role to"),
         ),
     Effect.fn("server.add.monitor_role")(function* (command) {
-      const response = yield* InteractionResponse;
-      yield* response.deferReply();
-
-      const guildId = yield* resolveGuildId(command.optionValueOptional("server_id"));
-      const guild = yield* guildsCache.get(guildId);
-      const role = command.optionRoleValue("role") as { id: string };
-      const addMonitorRoleResult = yield* Effect.result(
-        guildConfigService.addGuildMonitorRole(guildId, role.id),
+      const roleId = yield* requireResolvedId(command.optionRoleValue("role"), "role");
+      const base = yield* makeDispatchBase;
+      yield* dispatchServerCommand(
+        "the monitor role add",
+        SheetClusterRequestContext.asInteractionUser(() =>
+          Effect.gen(function* () {
+            const guildId = yield* resolveGuildId(command.optionValueOptional("server_id"));
+            return yield* sheetClusterClient.get().dispatch.serverAddMonitorRole({
+              payload: { ...base, guildId, roleId },
+            });
+          }),
+        )(),
       );
-
-      if (Result.isFailure(addMonitorRoleResult)) {
-        if (isUnauthorized(addMonitorRoleResult.failure)) {
-          yield* response.editReply({
-            payload: { content: "You need Manage Guild to use this command." },
-          });
-          return;
-        }
-        yield* Effect.fail(addMonitorRoleResult.failure);
-      }
-
-      yield* response.editReply({
-        payload: {
-          embeds: [
-            (yield* embedService.makeBaseEmbedBuilder())
-              .setTitle("Success!")
-              .setDescription(
-                `${roleMention(role.id)} is now a monitor role for ${escapeMarkdown(guild.name)}`,
-              )
-              .toJSON(),
-          ],
-        },
-      });
     }),
   );
 });
@@ -178,9 +99,7 @@ const makeAddCommandGroup = Effect.gen(function* () {
 });
 
 const makeRemoveMonitorRoleSubCommand = Effect.gen(function* () {
-  const embedService = yield* EmbedService;
-  const guildConfigService = yield* GuildConfigService;
-  const guildsCache = yield* GuildsCache;
+  const sheetClusterClient = yield* SheetClusterClient;
 
   return yield* CommandHelper.makeSubCommand(
     (builder) =>
@@ -196,38 +115,19 @@ const makeRemoveMonitorRoleSubCommand = Effect.gen(function* () {
             .setDescription("The server id to remove the monitor role from"),
         ),
     Effect.fn("server.remove.monitor_role")(function* (command) {
-      const response = yield* InteractionResponse;
-      yield* response.deferReply();
-
-      const guildId = yield* resolveGuildId(command.optionValueOptional("server_id"));
-      const guild = yield* guildsCache.get(guildId);
-      const role = command.optionRoleValue("role") as { id: string };
-      const removeMonitorRoleResult = yield* Effect.result(
-        guildConfigService.removeGuildMonitorRole(guildId, role.id),
+      const roleId = yield* requireResolvedId(command.optionRoleValue("role"), "role");
+      const base = yield* makeDispatchBase;
+      yield* dispatchServerCommand(
+        "the monitor role removal",
+        SheetClusterRequestContext.asInteractionUser(() =>
+          Effect.gen(function* () {
+            const guildId = yield* resolveGuildId(command.optionValueOptional("server_id"));
+            return yield* sheetClusterClient.get().dispatch.serverRemoveMonitorRole({
+              payload: { ...base, guildId, roleId },
+            });
+          }),
+        )(),
       );
-
-      if (Result.isFailure(removeMonitorRoleResult)) {
-        if (isUnauthorized(removeMonitorRoleResult.failure)) {
-          yield* response.editReply({
-            payload: { content: "You need Manage Guild to use this command." },
-          });
-          return;
-        }
-        yield* Effect.fail(removeMonitorRoleResult.failure);
-      }
-
-      yield* response.editReply({
-        payload: {
-          embeds: [
-            (yield* embedService.makeBaseEmbedBuilder())
-              .setTitle("Success!")
-              .setDescription(
-                `${roleMention(role.id)} is no longer a monitor role for ${escapeMarkdown(guild.name)}`,
-              )
-              .toJSON(),
-          ],
-        },
-      });
     }),
   );
 });
@@ -249,9 +149,7 @@ const makeRemoveCommandGroup = Effect.gen(function* () {
 });
 
 const makeSetSheetSubCommand = Effect.gen(function* () {
-  const embedService = yield* EmbedService;
-  const guildConfigService = yield* GuildConfigService;
-  const guildsCache = yield* GuildsCache;
+  const sheetClusterClient = yield* SheetClusterClient;
 
   return yield* CommandHelper.makeSubCommand(
     (builder) =>
@@ -265,46 +163,25 @@ const makeSetSheetSubCommand = Effect.gen(function* () {
           builder.setName("server_id").setDescription("The server id to set the sheet id for"),
         ),
     Effect.fn("server.set.sheet")(function* (command) {
-      const response = yield* InteractionResponse;
-      yield* response.deferReply();
-
-      const guildId = yield* resolveGuildId(command.optionValueOptional("server_id"));
-      const sheetId = command.optionValue("sheet_id");
-      const guild = yield* guildsCache.get(guildId);
-      const updateSheetResult = yield* Effect.result(
-        guildConfigService.upsertGuildConfig(guildId, { sheetId }),
+      const sheetId = yield* requireString(command.optionValue("sheet_id"), "sheet ID");
+      const base = yield* makeDispatchBase;
+      yield* dispatchServerCommand(
+        "the server sheet update",
+        SheetClusterRequestContext.asInteractionUser(() =>
+          Effect.gen(function* () {
+            const guildId = yield* resolveGuildId(command.optionValueOptional("server_id"));
+            return yield* sheetClusterClient.get().dispatch.serverSetSheet({
+              payload: { ...base, guildId, sheetId },
+            });
+          }),
+        )(),
       );
-
-      if (Result.isFailure(updateSheetResult)) {
-        if (isUnauthorized(updateSheetResult.failure)) {
-          yield* response.editReply({
-            payload: { content: "You need Manage Guild to use this command." },
-          });
-          return;
-        }
-        yield* Effect.fail(updateSheetResult.failure);
-      }
-
-      yield* response.editReply({
-        payload: {
-          embeds: [
-            (yield* embedService.makeBaseEmbedBuilder())
-              .setTitle("Success!")
-              .setDescription(
-                `Sheet id for ${escapeMarkdown(guild.name)} is now set to ${escapeMarkdown(sheetId)}`,
-              )
-              .toJSON(),
-          ],
-        },
-      });
     }),
   );
 });
 
 const makeSetAutoCheckinSubCommand = Effect.gen(function* () {
-  const embedService = yield* EmbedService;
-  const guildConfigService = yield* GuildConfigService;
-  const guildsCache = yield* GuildsCache;
+  const sheetClusterClient = yield* SheetClusterClient;
 
   return yield* CommandHelper.makeSubCommand(
     (builder) =>
@@ -321,42 +198,22 @@ const makeSetAutoCheckinSubCommand = Effect.gen(function* () {
           builder.setName("server_id").setDescription("The server id to set auto check-in for"),
         ),
     Effect.fn("server.set.auto_checkin")(function* (command) {
-      const response = yield* InteractionResponse;
-      yield* response.deferReply();
-
-      const guildId = yield* resolveGuildId(command.optionValueOptional("server_id"));
-      const autoCheckin = command.optionValue("auto_checkin");
-      const updateAutoCheckinResult = yield* Effect.result(
-        guildConfigService.upsertGuildConfig(guildId, { autoCheckin }),
+      const autoCheckin = yield* requireBoolean(
+        command.optionValue("auto_checkin"),
+        "auto check-in",
       );
-
-      if (Result.isSuccess(updateAutoCheckinResult)) {
-        const guild = yield* guildsCache.get(guildId);
-        const guildConfig = updateAutoCheckinResult.success;
-
-        yield* response.editReply({
-          payload: {
-            embeds: [
-              (yield* embedService.makeBaseEmbedBuilder())
-                .setTitle("Success!")
-                .setDescription(
-                  `Auto check-in for ${escapeMarkdown(guild.name)} is now ${isAutoCheckinEnabled(guildConfig.autoCheckin) ? "enabled" : "disabled"}.`,
-                )
-                .toJSON(),
-            ],
-          },
-        });
-        return;
-      }
-
-      if (isUnauthorized(updateAutoCheckinResult.failure)) {
-        yield* response.editReply({
-          payload: { content: "You need Manage Guild to use this command." },
-        });
-        return;
-      }
-
-      yield* Effect.fail(updateAutoCheckinResult.failure);
+      const base = yield* makeDispatchBase;
+      yield* dispatchServerCommand(
+        "the server auto check-in update",
+        SheetClusterRequestContext.asInteractionUser(() =>
+          Effect.gen(function* () {
+            const guildId = yield* resolveGuildId(command.optionValueOptional("server_id"));
+            return yield* sheetClusterClient.get().dispatch.serverSetAutoCheckin({
+              payload: { ...base, guildId, autoCheckin },
+            });
+          }),
+        )(),
+      );
     }),
   );
 });
@@ -404,14 +261,13 @@ const makeServerCommand = Effect.gen(function* () {
           InteractionContextType.Guild,
           InteractionContextType.PrivateChannel,
         ),
-    SheetApisRequestContext.asInteractionUser((command) =>
+    (command) =>
       command.subCommands({
         list_config: listConfigSubCommand.handler,
         add: addCommandGroup.handler,
         remove: removeCommandGroup.handler,
         set: setCommandGroup.handler,
       }),
-    ),
   );
 });
 
@@ -430,12 +286,6 @@ export const serverCommandLayer = Layer.effectDiscard(
   }),
 ).pipe(
   Layer.provide(
-    Layer.mergeAll(
-      discordGatewayLayer,
-      discordApplicationLayer,
-      cachesLayer,
-      GuildConfigService.layer,
-      EmbedService.layer,
-    ),
+    Layer.mergeAll(discordGatewayLayer, discordApplicationLayer, SheetClusterClient.layer),
   ),
 );

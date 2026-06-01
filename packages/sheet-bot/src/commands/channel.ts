@@ -1,84 +1,32 @@
-import { channelMention, escapeMarkdown, roleMention } from "@discordjs/formatters";
 import { InteractionsRegistry } from "dfx/gateway";
-import { ApplicationIntegrationType, InteractionContextType } from "discord-api-types/v10";
-import { Effect, Layer, Option, pipe } from "effect";
-import { CommandHelper, InteractionResponse } from "dfx-discord-utils/utils";
-import { Interaction } from "dfx-discord-utils/utils";
-import { discordGatewayLayer } from "../discord/gateway";
-import { EmbedService, GuildConfigService, SheetApisRequestContext } from "../services";
-import * as GuildConfig from "sheet-ingress-api/schemas/guildConfig";
 import { Ix } from "dfx/index";
+import { ApplicationIntegrationType, InteractionContextType } from "discord-api-types/v10";
+import { Effect, Layer, Option } from "effect";
+import { CommandHelper, InteractionResponse } from "dfx-discord-utils/utils";
+import { discordGatewayLayer } from "../discord/gateway";
 import { discordApplicationLayer } from "../discord/application";
-
-const configFields = (
-  config: GuildConfig.GuildChannelConfig,
-): Array<{ readonly name: string; readonly value: string }> => [
-  {
-    name: "Name",
-    value: pipe(
-      config.name,
-      Option.map(escapeMarkdown),
-      Option.getOrElse(() => "None!"),
-    ),
-  },
-  { name: "Running channel", value: Option.getOrUndefined(config.running) ? "Yes" : "No" },
-  {
-    name: "Role",
-    value: pipe(
-      config.roleId,
-      Option.map(roleMention),
-      Option.getOrElse(() => "None!"),
-    ),
-  },
-  {
-    name: "Checkin channel",
-    value: pipe(
-      config.checkinChannelId,
-      Option.map(channelMention),
-      Option.getOrElse(() => "None!"),
-    ),
-  },
-];
-
-const resolveGuildId: (serverId: Option.Option<string>) => Effect.Effect<string, unknown, unknown> =
-  Effect.fn("resolveGuildId")(function* (serverId: Option.Option<string>) {
-    const explicitGuildId = Option.getOrUndefined(serverId);
-    if (typeof explicitGuildId === "string") {
-      return explicitGuildId;
-    }
-
-    const interactionGuild = yield* Interaction.guild();
-    const interactionGuildId = pipe(
-      interactionGuild,
-      Option.map((guild) => (guild as { id: string }).id),
-      Option.getOrUndefined,
-    );
-    if (typeof interactionGuildId === "string") {
-      return interactionGuildId;
-    }
-
-    return yield* Effect.fail(new Error("Guild not found in interaction or command options"));
-  });
-
-const getInteractionChannelId: Effect.Effect<Option.Option<string>, unknown, unknown> = Effect.gen(
-  function* () {
-    const interactionChannel = yield* Interaction.channel();
-    return pipe(
-      interactionChannel,
-      Option.map((channel) => (channel as { id: string }).id),
-    );
-  },
-);
+import { SheetClusterClient, SheetClusterRequestContext } from "../services";
+import {
+  makeDispatchBase,
+  requireBoolean,
+  requireResolvedId,
+  requireString,
+  resolveChannelId,
+  resolveGuildId,
+} from "../utils/commandHelpers";
+import { runSheetClusterDispatch } from "../utils/sheetClusterDispatch";
 
 const makeListConfigSubCommand = Effect.gen(function* () {
-  const embedService = yield* EmbedService;
-  const guildConfigService = yield* GuildConfigService;
+  const sheetClusterClient = yield* SheetClusterClient;
 
   return yield* CommandHelper.makeSubCommand(
     (builder) =>
       builder
         .setName("list_config")
         .setDescription("List the config for the channel")
+        .addChannelOption((builder) =>
+          builder.setName("channel").setDescription("The channel to list the config for"),
+        )
         .addStringOption((builder) =>
           builder.setName("server_id").setDescription("The server id to list the config for"),
         ),
@@ -86,29 +34,25 @@ const makeListConfigSubCommand = Effect.gen(function* () {
       const response = yield* InteractionResponse;
       yield* response.deferReply();
 
-      const serverId = command.optionValueOptional("server_id");
-      const guildId: string = yield* resolveGuildId(serverId);
-      const channelId: string = Option.getOrThrow(yield* getInteractionChannelId);
+      const guildId = yield* resolveGuildId(command.optionValueOptional("server_id"));
+      const channelId = yield* resolveChannelId(command.optionChannelValueOptional("channel"));
+      const base = yield* makeDispatchBase;
 
-      const config = yield* guildConfigService.getGuildChannelById(guildId, channelId as string);
-
-      yield* response.editReply({
-        payload: {
-          embeds: [
-            (yield* embedService.makeBaseEmbedBuilder())
-              .setTitle(`Config for this channel`)
-              .addFields(...configFields(config))
-              .toJSON(),
-          ],
-        },
-      });
+      yield* runSheetClusterDispatch(
+        response,
+        "the channel config list",
+        SheetClusterRequestContext.asInteractionUser(() =>
+          sheetClusterClient.get().dispatch.channelListConfig({
+            payload: { ...base, guildId, channelId },
+          }),
+        )(),
+      );
     }),
   );
 });
 
 const makeSetSubCommand = Effect.gen(function* () {
-  const embedService = yield* EmbedService;
-  const guildConfigService = yield* GuildConfigService;
+  const sheetClusterClient = yield* SheetClusterClient;
 
   return yield* CommandHelper.makeSubCommand(
     (builder) =>
@@ -139,61 +83,45 @@ const makeSetSubCommand = Effect.gen(function* () {
       const response = yield* InteractionResponse;
       yield* response.deferReply();
 
-      const serverId = command.optionValueOptional("server_id");
-      const guildId: string = yield* resolveGuildId(serverId);
-
-      const channelOption = command.optionChannelValueOptional("channel");
+      const guildId = yield* resolveGuildId(command.optionValueOptional("server_id"));
+      const channelId = yield* resolveChannelId(command.optionChannelValueOptional("channel"));
       const running = command.optionValueOptional("running");
       const name = command.optionValueOptional("name");
       const role = command.optionRoleValueOptional("role");
       const checkinChannel = command.optionChannelValueOptional("checkin_channel");
+      const runningValue = Option.isSome(running)
+        ? yield* requireBoolean(running.value, "running")
+        : undefined;
+      const nameValue = Option.isSome(name) ? yield* requireString(name.value, "name") : undefined;
+      const roleId = Option.isSome(role) ? yield* requireResolvedId(role.value, "role") : undefined;
+      const checkinChannelId = Option.isSome(checkinChannel)
+        ? yield* requireResolvedId(checkinChannel.value, "check-in channel")
+        : undefined;
+      const base = yield* makeDispatchBase;
 
-      const channelId: string = yield* pipe(
-        channelOption,
-        Option.map((c) => (c as { id: string }).id),
-        Option.match({
-          onSome: Effect.succeed,
-          onNone: () =>
-            pipe(
-              getInteractionChannelId,
-              Effect.map(
-                Option.getOrThrowWith(() => new Error("Channel not found in interaction")),
-              ),
-            ),
-        }),
+      yield* runSheetClusterDispatch(
+        response,
+        "the channel config update",
+        SheetClusterRequestContext.asInteractionUser(() =>
+          sheetClusterClient.get().dispatch.channelSet({
+            payload: {
+              ...base,
+              guildId,
+              channelId,
+              ...(runningValue === undefined ? {} : { running: runningValue }),
+              ...(nameValue === undefined ? {} : { name: nameValue }),
+              ...(roleId === undefined ? {} : { roleId }),
+              ...(checkinChannelId === undefined ? {} : { checkinChannelId }),
+            },
+          }),
+        )(),
       );
-
-      const config = yield* guildConfigService.upsertGuildChannelConfig(
-        guildId,
-        channelId as string,
-        {
-          ...(Option.isSome(running) ? { running: running.value } : {}),
-          ...(Option.isSome(name) ? { name: name.value } : {}),
-          ...(Option.isSome(role) ? { roleId: (role.value as { id: string }).id } : {}),
-          ...(Option.isSome(checkinChannel)
-            ? { checkinChannelId: (checkinChannel.value as { id: string }).id }
-            : {}),
-        },
-      );
-
-      yield* response.editReply({
-        payload: {
-          embeds: [
-            (yield* embedService.makeBaseEmbedBuilder())
-              .setTitle(`Success!`)
-              .setDescription(`${channelMention(channelId as string)} configuration updated`)
-              .addFields(...configFields(config))
-              .toJSON(),
-          ],
-        },
-      });
     }),
   );
 });
 
 const makeUnsetSubCommand = Effect.gen(function* () {
-  const embedService = yield* EmbedService;
-  const guildConfigService = yield* GuildConfigService;
+  const sheetClusterClient = yield* SheetClusterClient;
 
   return yield* CommandHelper.makeSubCommand(
     (builder) =>
@@ -224,52 +152,31 @@ const makeUnsetSubCommand = Effect.gen(function* () {
       const response = yield* InteractionResponse;
       yield* response.deferReply();
 
-      const serverId = command.optionValueOptional("server_id");
-      const guildId: string = yield* resolveGuildId(serverId);
+      const guildId = yield* resolveGuildId(command.optionValueOptional("server_id"));
+      const channelId = yield* resolveChannelId(command.optionChannelValueOptional("channel"));
+      const base = yield* makeDispatchBase;
 
-      const running = command.optionValueOptional("running");
-      const channelOption = command.optionChannelValueOptional("channel");
-      const name = command.optionValueOptional("name");
-      const role = command.optionValueOptional("role");
-      const checkinChannel = command.optionValueOptional("checkin_channel");
-
-      const channelId: string = yield* pipe(
-        channelOption,
-        Option.map((c) => (c as { id: string }).id),
-        Option.match({
-          onSome: Effect.succeed,
-          onNone: () =>
-            pipe(
-              getInteractionChannelId,
-              Effect.map(
-                Option.getOrThrowWith(() => new Error("Channel not found in interaction")),
-              ),
-            ),
-        }),
+      yield* runSheetClusterDispatch(
+        response,
+        "the channel config update",
+        SheetClusterRequestContext.asInteractionUser(() =>
+          sheetClusterClient.get().dispatch.channelUnset({
+            payload: {
+              ...base,
+              guildId,
+              channelId,
+              ...(Option.getOrUndefined(command.optionValueOptional("running"))
+                ? { running: true }
+                : {}),
+              ...(Option.getOrUndefined(command.optionValueOptional("name")) ? { name: true } : {}),
+              ...(Option.getOrUndefined(command.optionValueOptional("role")) ? { role: true } : {}),
+              ...(Option.getOrUndefined(command.optionValueOptional("checkin_channel"))
+                ? { checkinChannel: true }
+                : {}),
+            },
+          }),
+        )(),
       );
-
-      const config = yield* guildConfigService.upsertGuildChannelConfig(
-        guildId,
-        channelId as string,
-        {
-          ...(Option.getOrUndefined(running) ? { running: null } : {}),
-          ...(Option.getOrUndefined(name) ? { name: null } : {}),
-          ...(Option.getOrUndefined(role) ? { roleId: null } : {}),
-          ...(Option.getOrUndefined(checkinChannel) ? { checkinChannelId: null } : {}),
-        },
-      );
-
-      yield* response.editReply({
-        payload: {
-          embeds: [
-            (yield* embedService.makeBaseEmbedBuilder())
-              .setTitle(`Success!`)
-              .setDescription(`${channelMention(channelId as string)} configuration updated`)
-              .addFields(...configFields(config))
-              .toJSON(),
-          ],
-        },
-      });
     }),
   );
 });
@@ -296,13 +203,12 @@ const makeChannelCommand = Effect.gen(function* () {
         .addSubcommand(() => listConfigSubCommand.data)
         .addSubcommand(() => setSubCommand.data)
         .addSubcommand(() => unsetSubCommand.data),
-    SheetApisRequestContext.asInteractionUser((command) =>
+    (command) =>
       command.subCommands({
         list_config: listConfigSubCommand.handler,
         set: setSubCommand.handler,
         unset: unsetSubCommand.handler,
       }),
-    ),
   );
 });
 
@@ -321,11 +227,6 @@ export const channelCommandLayer = Layer.effectDiscard(
   }),
 ).pipe(
   Layer.provide(
-    Layer.mergeAll(
-      discordGatewayLayer,
-      discordApplicationLayer,
-      GuildConfigService.layer,
-      EmbedService.layer,
-    ),
+    Layer.mergeAll(discordGatewayLayer, discordApplicationLayer, SheetClusterClient.layer),
   ),
 );

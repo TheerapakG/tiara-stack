@@ -1,58 +1,26 @@
-import { escapeMarkdown } from "@discordjs/formatters";
 import { InteractionsRegistry } from "dfx/gateway";
+import { Ix } from "dfx/index";
 import {
   ApplicationIntegrationType,
   InteractionContextType,
   MessageFlags,
 } from "discord-api-types/v10";
-import { Ix } from "dfx/index";
-import { Effect, Layer, Option, pipe } from "effect";
+import { Effect, Layer, Option } from "effect";
 import { discordGatewayLayer } from "../discord/gateway";
 import { CommandHelper, InteractionResponse } from "dfx-discord-utils/utils";
-import { Interaction } from "dfx-discord-utils/utils";
-import {
-  EmbedService,
-  PermissionService,
-  ScheduleService,
-  SheetApisRequestContext,
-} from "../services";
+import { SheetClusterClient, SheetClusterRequestContext } from "../services";
 import { discordApplicationLayer } from "../discord/application";
-
-const getInteractionGuildId = Effect.gen(function* () {
-  const interactionGuild = yield* Interaction.guild();
-  return pipe(
-    interactionGuild,
-    Option.map((guild) => (guild as { id: string }).id),
-  );
-});
-
-const getInteractionUser = Effect.gen(function* () {
-  return (yield* Interaction.user()) as { id: string; username: string };
-});
-
-const formatHourRanges = (hours: readonly number[]): string => {
-  if (hours.length === 0) return "None";
-  const sorted = [...hours].sort((a, b) => a - b);
-  const ranges: { start: number; end: number }[] = [];
-  for (const h of sorted) {
-    const last = ranges[ranges.length - 1];
-    if (!last) {
-      ranges.push({ start: h, end: h });
-    } else if (h === last.end + 1) {
-      last.end = h;
-    } else if (h !== last.end) {
-      ranges.push({ start: h, end: h });
-    }
-  }
-  return ranges
-    .map(({ start, end }) => (start === end ? `${start}` : `${start}-${end}`))
-    .join(", ");
-};
+import {
+  getInteractionUser,
+  makeDispatchBase,
+  requireNumber,
+  resolveGuildId,
+  toDiscordUserIdentity,
+} from "../utils/commandHelpers";
+import { runSheetClusterDispatch } from "../utils/sheetClusterDispatch";
 
 const makeListSubCommand = Effect.gen(function* () {
-  const embedService = yield* EmbedService;
-  const permissionService = yield* PermissionService;
-  const scheduleService = yield* ScheduleService;
+  const sheetClusterClient = yield* SheetClusterClient;
 
   return yield* CommandHelper.makeSubCommand(
     (builder) =>
@@ -72,56 +40,30 @@ const makeListSubCommand = Effect.gen(function* () {
       const response = yield* InteractionResponse;
       yield* response.deferReply({ flags: MessageFlags.Ephemeral });
 
-      const serverId = command.optionValueOptional("server_id");
-      const interactionGuildId = yield* getInteractionGuildId;
-      const guildId = pipe(
-        serverId,
-        Option.orElse(() => interactionGuildId),
-        Option.getOrThrow,
-      );
-
-      const day = command.optionValue("day");
+      const guildId = yield* resolveGuildId(command.optionValueOptional("server_id"));
+      const day = yield* requireNumber(command.optionValue("day"), "day");
       const interactionUser = yield* getInteractionUser;
-
-      yield* permissionService
-        .checkInteractionUserApplicationOwner()
-        .pipe(
-          Effect.catch(() =>
-            permissionService.checkInteractionInGuild(Option.getOrUndefined(serverId)),
-          ),
-        );
-
       const targetUser = command.optionUserValueOptional("user").pipe(
-        Option.map(({ user }) => user as { id: string; username: string }),
+        Option.flatMap(({ user }) => toDiscordUserIdentity(user)),
         Option.getOrElse(() => interactionUser),
       );
+      const base = yield* makeDispatchBase;
 
-      const { schedule } = yield* scheduleService.dayPlayerSchedule(guildId, day, targetUser.id);
-
-      yield* response.editReply({
-        payload: {
-          embeds: [
-            (yield* embedService.makeBaseEmbedBuilder())
-              .setTitle(`${escapeMarkdown(targetUser.username)}'s Schedule for Day ${day}`)
-              .setDescription(
-                schedule.invisible
-                  ? "It is kinda foggy around here... This schedule is not visible to you yet."
-                  : null,
-              )
-              .addFields(
-                schedule.invisible
-                  ? []
-                  : [
-                      { name: "Fill", value: formatHourRanges(schedule.fillHours) },
-                      { name: "Overfill", value: formatHourRanges(schedule.overfillHours) },
-                      { name: "Standby", value: formatHourRanges(schedule.standbyHours) },
-                    ],
-              )
-              .toJSON(),
-            (yield* embedService.makeWebScheduleEmbed()).toJSON(),
-          ],
-        },
-      });
+      yield* runSheetClusterDispatch(
+        response,
+        "the schedule list",
+        SheetClusterRequestContext.asInteractionUser(() =>
+          sheetClusterClient.get().dispatch.scheduleList({
+            payload: {
+              ...base,
+              guildId,
+              day,
+              targetUserId: targetUser.id,
+              targetUsername: targetUser.username,
+            },
+          }),
+        )(),
+      );
     }),
   );
 });
@@ -144,11 +86,10 @@ const makeScheduleCommand = Effect.gen(function* () {
           InteractionContextType.PrivateChannel,
         )
         .addSubcommand(() => listSubCommand.data),
-    SheetApisRequestContext.asInteractionUser((command) =>
+    (command) =>
       command.subCommands({
         list: listSubCommand.handler,
       }),
-    ),
   );
 });
 
@@ -167,12 +108,6 @@ export const scheduleCommandLayer = Layer.effectDiscard(
   }),
 ).pipe(
   Layer.provide(
-    Layer.mergeAll(
-      discordGatewayLayer,
-      discordApplicationLayer,
-      PermissionService.layer,
-      EmbedService.layer,
-      ScheduleService.layer,
-    ),
+    Layer.mergeAll(discordGatewayLayer, discordApplicationLayer, SheetClusterClient.layer),
   ),
 );

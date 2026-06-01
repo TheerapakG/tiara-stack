@@ -1,5 +1,5 @@
 export * from "./config";
 export * from "./gateway";
 export * from "./api";
-export * from "./rpc";
+export * from "./http";
 export * from "./discordApiClient";

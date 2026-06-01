@@ -150,5 +150,12 @@ describe("Api", () => {
       name: "updateOriginalInteractionResponse",
       path: "/bot/interactions/original-response",
     });
+    expect(
+      Api.groups.ingressBot.endpoints.updateOriginalInteractionResponseWithFiles,
+    ).toMatchObject({
+      method: "PATCH",
+      name: "updateOriginalInteractionResponseWithFiles",
+      path: "/bot/interactions/original-response/files",
+    });
   });
 });

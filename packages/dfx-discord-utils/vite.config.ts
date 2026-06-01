@@ -26,7 +26,7 @@ const directEntries = {
   ),
   "discord/schema": fileURLToPath(new URL("./src/discord/schema/index.ts", import.meta.url)),
   "discord/gateway": fileURLToPath(new URL("./src/discord/gateway.ts", import.meta.url)),
-  "discord/rpc": fileURLToPath(new URL("./src/discord/rpc.ts", import.meta.url)),
+  "discord/http": fileURLToPath(new URL("./src/discord/http.ts", import.meta.url)),
   "discord/discordApiClient": fileURLToPath(
     new URL("./src/discord/discordApiClient.ts", import.meta.url),
   ),
