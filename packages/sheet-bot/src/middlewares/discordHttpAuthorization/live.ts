@@ -20,6 +20,11 @@ const makeSheetIngressAuthorizer = Effect.gen(function* () {
   });
 });
 
+export const isHealthProbeRequest = (request: HttpServerRequest.HttpServerRequest) => {
+  const pathname = new URL(request.url, "http://localhost").pathname;
+  return request.method === "GET" && (pathname === "/live" || pathname === "/ready");
+};
+
 export const sheetBotHttpAuthorizationLayer = Layer.unwrap(
   Effect.gen(function* () {
     const authorizer = yield* makeSheetIngressAuthorizer;
@@ -28,7 +33,9 @@ export const sheetBotHttpAuthorizationLayer = Layer.unwrap(
       HttpMiddleware.make((httpEffect) =>
         Effect.gen(function* () {
           const request = yield* HttpServerRequest.HttpServerRequest;
-          yield* authorizer.requireAuthorizedHeaders(request.headers);
+          if (!isHealthProbeRequest(request)) {
+            yield* authorizer.requireAuthorizedHeaders(request.headers);
+          }
           return yield* httpEffect;
         }).pipe(
           Effect.catchTag("Unauthorized", (error) =>
