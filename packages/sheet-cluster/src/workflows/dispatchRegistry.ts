@@ -1,5 +1,11 @@
 import { Effect, Layer, Option, Schema } from "effect";
+import { Sharding } from "effect/unstable/cluster";
 import { Activity } from "effect/unstable/workflow";
+import {
+  DispatchButtonEntity,
+  type DispatchButtonOperation,
+  makeDispatchButtonEntityLayer,
+} from "@/entities/dispatchButton";
 import {
   type DispatchAuthorizationSnapshot,
   type DispatchWorkflowOperation,
@@ -100,8 +106,35 @@ type DispatchWorkflowHandlerOptions<
   ) => Effect.Effect<DispatchWorkflowSuccess<TWorkflow>, unknown, RExecute>;
 };
 
+type DispatchButtonWorkflowByOperation = {
+  readonly slotOpenButton: typeof DispatchSlotOpenButtonWorkflow;
+  readonly checkinButton: typeof DispatchCheckinButtonWorkflow;
+  readonly roomOrderPreviousButton: typeof DispatchRoomOrderPreviousButtonWorkflow;
+  readonly roomOrderNextButton: typeof DispatchRoomOrderNextButtonWorkflow;
+  readonly roomOrderSendButton: typeof DispatchRoomOrderSendButtonWorkflow;
+  readonly roomOrderPinTentativeButton: typeof DispatchRoomOrderPinTentativeButtonWorkflow;
+};
+
+type DispatchButtonWorkflowHandlerOptions<
+  TOperation extends DispatchButtonOperation,
+  TAuthorization,
+  RAuthorize,
+  RExecute,
+> = DispatchWorkflowHandlerOptions<
+  DispatchButtonWorkflowByOperation[TOperation],
+  TAuthorization,
+  RAuthorize,
+  RExecute
+> & {
+  readonly operation: TOperation;
+};
+
 const WorkflowAttributesPayload = Schema.Struct({
   dispatchRequestId: Schema.optional(Schema.String),
+});
+
+const DispatchButtonMessageIdPayload = Schema.Struct({
+  messageId: Schema.String,
 });
 
 const workflowAttributes = (
@@ -257,41 +290,158 @@ export const makeWorkflowHandler =
   ): DispatchWorkflowHandler<TWorkflow, RAuthorize | RExecute | IngressBotClient> =>
   (request, executionId) =>
     Effect.gen(function* () {
-      const attributes = workflowAttributes(options.operation, executionId, request);
-      const effect = options.authorize(request).pipe(
-        Effect.withSpan("DispatchWorkflow.authorize", { attributes }),
-        Effect.flatMap((authorization) =>
-          options
-            .execute(request, authorization)
-            .pipe(Effect.withSpan("DispatchWorkflow.execute", { attributes })),
-        ),
-        Effect.tapError((error) =>
-          isInteractionFailureHandled(error)
-            ? Effect.void
-            : notifyInteractionFailure(options.getInteractionToken(request)).pipe(
-                Effect.withSpan("DispatchWorkflow.notifyInteractionFailure", { attributes }),
-              ),
-        ),
-        Effect.mapError(
-          (error): DispatchWorkflowError<TWorkflow> =>
-            normalizeDispatchError(`Failed to dispatch ${options.operation}`)(
-              unwrapInteractionFailure(error),
-            ) as DispatchWorkflowError<TWorkflow>,
-        ),
-        Effect.annotateLogs(attributes),
-      );
-
       return yield* Activity.make({
         name: `dispatch.${options.operation}.${executionId}.execute`,
         success: options.workflow.successSchema,
         error: options.workflow.errorSchema,
-        execute: effect,
+        execute: runDispatchWorkflowOperation(options, request, executionId),
       });
     }) as Effect.Effect<
       DispatchWorkflowSuccess<TWorkflow>,
       DispatchWorkflowError<TWorkflow>,
       RAuthorize | RExecute | IngressBotClient
     >;
+
+export const makeButtonWorkflowHandler =
+  <TOperation extends DispatchButtonOperation, TAuthorization, RAuthorize, RExecute>(
+    options: DispatchButtonWorkflowHandlerOptions<TOperation, TAuthorization, RAuthorize, RExecute>,
+  ): DispatchWorkflowHandler<DispatchButtonWorkflowByOperation[TOperation], Sharding.Sharding> =>
+  (request, executionId) =>
+    Effect.gen(function* () {
+      return yield* Activity.make({
+        name: `dispatch.${options.operation}.${executionId}.execute`,
+        success: options.workflow.successSchema,
+        error: options.workflow.errorSchema,
+        execute: dispatchViaButtonEntity(options, request, executionId) as Effect.Effect<
+          DispatchWorkflowSuccess<DispatchButtonWorkflowByOperation[TOperation]>,
+          DispatchWorkflowError<DispatchButtonWorkflowByOperation[TOperation]>,
+          Sharding.Sharding
+        >,
+      });
+    }) as Effect.Effect<
+      DispatchWorkflowSuccess<DispatchButtonWorkflowByOperation[TOperation]>,
+      DispatchWorkflowError<DispatchButtonWorkflowByOperation[TOperation]>,
+      Sharding.Sharding
+    >;
+
+export const runDispatchWorkflowOperation = <
+  TWorkflow extends DispatchWorkflow,
+  TAuthorization,
+  RAuthorize,
+  RExecute,
+>(
+  options: DispatchWorkflowHandlerOptions<TWorkflow, TAuthorization, RAuthorize, RExecute>,
+  request: DispatchWorkflowPayload<TWorkflow>,
+  executionId: string,
+) => {
+  const attributes = workflowAttributes(options.operation, executionId, request);
+  return options.authorize(request).pipe(
+    Effect.withSpan("DispatchWorkflow.authorize", { attributes }),
+    Effect.flatMap((authorization) =>
+      options
+        .execute(request, authorization)
+        .pipe(Effect.withSpan("DispatchWorkflow.execute", { attributes })),
+    ),
+    Effect.tapError((error) =>
+      isInteractionFailureHandled(error)
+        ? Effect.void
+        : notifyInteractionFailure(options.getInteractionToken(request)).pipe(
+            Effect.withSpan("DispatchWorkflow.notifyInteractionFailure", { attributes }),
+          ),
+    ),
+    Effect.mapError(
+      (error): DispatchWorkflowError<TWorkflow> =>
+        normalizeDispatchError(`Failed to dispatch ${options.operation}`)(
+          unwrapInteractionFailure(error),
+        ) as DispatchWorkflowError<TWorkflow>,
+    ),
+    Effect.annotateLogs(attributes),
+  );
+};
+
+const dispatchViaButtonEntity = <
+  TOperation extends DispatchButtonOperation,
+  TAuthorization,
+  RAuthorize,
+  RExecute,
+>(
+  options: DispatchButtonWorkflowHandlerOptions<TOperation, TAuthorization, RAuthorize, RExecute>,
+  request: DispatchWorkflowPayload<DispatchButtonWorkflowByOperation[TOperation]>,
+  executionId: string,
+) =>
+  Effect.gen(function* () {
+    const messageId = yield* dispatchButtonMessageId(request);
+    const attributes = { operation: options.operation, executionId, messageId };
+    yield* Effect.logDebug("Dispatching button workflow through message entity").pipe(
+      Effect.annotateLogs(attributes),
+    );
+    const clientFor = yield* DispatchButtonEntity.client;
+    const client = clientFor(messageId);
+
+    switch (options.operation) {
+      case "slotOpenButton":
+        return yield* client.slotOpenButton({
+          request: yield* Schema.decodeUnknownEffect(DispatchSlotOpenButtonWorkflow.payloadSchema)(
+            request,
+          ).pipe(Effect.orDie),
+          executionId,
+        });
+      case "checkinButton":
+        return yield* client.checkinButton({
+          request: yield* Schema.decodeUnknownEffect(DispatchCheckinButtonWorkflow.payloadSchema)(
+            request,
+          ).pipe(Effect.orDie),
+          executionId,
+        });
+      case "roomOrderPreviousButton":
+        return yield* client.roomOrderPreviousButton({
+          request: yield* Schema.decodeUnknownEffect(
+            DispatchRoomOrderPreviousButtonWorkflow.payloadSchema,
+          )(request).pipe(Effect.orDie),
+          executionId,
+        });
+      case "roomOrderNextButton":
+        return yield* client.roomOrderNextButton({
+          request: yield* Schema.decodeUnknownEffect(
+            DispatchRoomOrderNextButtonWorkflow.payloadSchema,
+          )(request).pipe(Effect.orDie),
+          executionId,
+        });
+      case "roomOrderSendButton":
+        return yield* client.roomOrderSendButton({
+          request: yield* Schema.decodeUnknownEffect(
+            DispatchRoomOrderSendButtonWorkflow.payloadSchema,
+          )(request).pipe(Effect.orDie),
+          executionId,
+        });
+      case "roomOrderPinTentativeButton":
+        return yield* client.roomOrderPinTentativeButton({
+          request: yield* Schema.decodeUnknownEffect(
+            DispatchRoomOrderPinTentativeButtonWorkflow.payloadSchema,
+          )(request).pipe(Effect.orDie),
+          executionId,
+        });
+      default:
+        return yield* Effect.die(
+          new Error(`Unhandled DispatchButtonOperation: ${String(options.operation as string)}`),
+        );
+    }
+  }).pipe(
+    Effect.withSpan("DispatchWorkflow.dispatchButtonEntity", {
+      attributes: {
+        operation: options.operation,
+        executionId,
+      },
+    }),
+  );
+
+const dispatchButtonMessageId = (request: { readonly payload: unknown }) =>
+  Schema.decodeUnknownEffect(DispatchButtonMessageIdPayload)(request.payload).pipe(
+    Effect.map((payload) => payload.messageId),
+    Effect.catch(() =>
+      Effect.die(new Error("Dispatch button request payload is missing messageId")),
+    ),
+  );
 
 export const dispatchWorkflowRegistry = {
   checkin: {
@@ -620,6 +770,45 @@ export const dispatchWorkflowRegistry = {
   },
 } as const;
 
+export const dispatchButtonEntityLayer = makeDispatchButtonEntityLayer({
+  slotOpenButton: ({ payload }) =>
+    runDispatchWorkflowOperation(
+      dispatchWorkflowRegistry.slotOpenButton,
+      payload.request,
+      payload.executionId,
+    ),
+  checkinButton: ({ payload }) =>
+    runDispatchWorkflowOperation(
+      dispatchWorkflowRegistry.checkinButton,
+      payload.request,
+      payload.executionId,
+    ),
+  roomOrderPreviousButton: ({ payload }) =>
+    runDispatchWorkflowOperation(
+      dispatchWorkflowRegistry.roomOrderPreviousButton,
+      payload.request,
+      payload.executionId,
+    ),
+  roomOrderNextButton: ({ payload }) =>
+    runDispatchWorkflowOperation(
+      dispatchWorkflowRegistry.roomOrderNextButton,
+      payload.request,
+      payload.executionId,
+    ),
+  roomOrderSendButton: ({ payload }) =>
+    runDispatchWorkflowOperation(
+      dispatchWorkflowRegistry.roomOrderSendButton,
+      payload.request,
+      payload.executionId,
+    ),
+  roomOrderPinTentativeButton: ({ payload }) =>
+    runDispatchWorkflowOperation(
+      dispatchWorkflowRegistry.roomOrderPinTentativeButton,
+      payload.request,
+      payload.executionId,
+    ),
+});
+
 export const dispatchWorkflowLayer = Layer.mergeAll(
   DispatchCheckinWorkflow.toLayer(
     makeWorkflowHandler({
@@ -647,7 +836,7 @@ export const dispatchWorkflowLayer = Layer.mergeAll(
     }),
   ),
   DispatchSlotOpenButtonWorkflow.toLayer(
-    makeWorkflowHandler({
+    makeButtonWorkflowHandler({
       ...dispatchWorkflowRegistry.slotOpenButton,
     }),
   ),
@@ -662,27 +851,27 @@ export const dispatchWorkflowLayer = Layer.mergeAll(
     }),
   ),
   DispatchCheckinButtonWorkflow.toLayer(
-    makeWorkflowHandler({
+    makeButtonWorkflowHandler({
       ...dispatchWorkflowRegistry.checkinButton,
     }),
   ),
   DispatchRoomOrderPreviousButtonWorkflow.toLayer(
-    makeWorkflowHandler({
+    makeButtonWorkflowHandler({
       ...dispatchWorkflowRegistry.roomOrderPreviousButton,
     }),
   ),
   DispatchRoomOrderNextButtonWorkflow.toLayer(
-    makeWorkflowHandler({
+    makeButtonWorkflowHandler({
       ...dispatchWorkflowRegistry.roomOrderNextButton,
     }),
   ),
   DispatchRoomOrderSendButtonWorkflow.toLayer(
-    makeWorkflowHandler({
+    makeButtonWorkflowHandler({
       ...dispatchWorkflowRegistry.roomOrderSendButton,
     }),
   ),
   DispatchRoomOrderPinTentativeButtonWorkflow.toLayer(
-    makeWorkflowHandler({
+    makeButtonWorkflowHandler({
       ...dispatchWorkflowRegistry.roomOrderPinTentativeButton,
     }),
   ),
@@ -741,6 +930,6 @@ export const dispatchWorkflowLayer = Layer.mergeAll(
       ...dispatchWorkflowRegistry.screenshot,
     }),
   ),
-).pipe(Layer.provide([DispatchService.layer, IngressBotClient.layer, SheetApisClient.layer]));
+);
 
 export const dispatchWorkflowNames = DispatchWorkflows.map((workflow) => workflow.name);

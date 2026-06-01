@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Context, Effect, Layer, Option, Schema } from "effect";
-import { ClusterSchema } from "effect/unstable/cluster";
+import { Context, Effect, Layer, Option, Schema, Stream } from "effect";
+import { ClusterSchema, Sharding } from "effect/unstable/cluster";
 import type { HttpApiClient } from "effect/unstable/httpapi";
 import { WorkflowEngine } from "effect/unstable/workflow";
 import { vi } from "vitest";
@@ -12,8 +12,9 @@ import {
 } from "sheet-ingress-api/sheet-cluster-workflows";
 import type {
   CheckinDispatchPayload,
-  CheckinHandleButtonPayload,
   CheckinDispatchResult,
+  CheckinHandleButtonPayload,
+  CheckinHandleButtonResult,
   GuildWelcomeDispatchPayload,
   GuildWelcomeDispatchResult,
   KickoutDispatchPayload,
@@ -34,9 +35,14 @@ import { DispatchService, IngressBotClient, SheetApisClient } from "@/services";
 import {
   dispatchWorkflowNames,
   dispatchWorkflowRegistry,
+  makeButtonWorkflowHandler,
   makeWorkflowHandler,
 } from "./dispatchRegistry";
-import { DispatchServiceStatusWorkflow, DispatchWorkflows } from "./dispatchWorkflows";
+import {
+  DispatchCheckinButtonWorkflow,
+  DispatchServiceStatusWorkflow,
+  DispatchWorkflows,
+} from "./dispatchWorkflows";
 
 const requester: DispatchRequester = {
   accountId: "account-1",
@@ -110,6 +116,7 @@ const pinTentativePayload: RoomOrderPinTentativeButtonPayload = {
 };
 
 type DispatchServiceMock = typeof DispatchService.Service;
+type ShardingMock = typeof Sharding.Sharding.Service;
 type SheetApisClientMock = typeof SheetApisClient.Service;
 type SheetApisApiClient = ReturnType<SheetApisClientMock["get"]>;
 type MessageCheckinClient = SheetApisApiClient["messageCheckin"];
@@ -162,6 +169,27 @@ const makeDispatchServiceMock = (overrides: Partial<DispatchServiceMock>): Dispa
   screenshot: unexpectedDispatchServiceCall("screenshot"),
   ...overrides,
 });
+
+const makeShardingMock = (overrides: Partial<ShardingMock>): ShardingMock =>
+  Sharding.Sharding.of({
+    getRegistrationEvents: Stream.empty,
+    getShardId: () => {
+      throw new Error("Unexpected Sharding.getShardId call");
+    },
+    hasShardId: () => false,
+    getSnowflake: Effect.die("Unexpected Sharding.getSnowflake call"),
+    isShutdown: Effect.succeed(false),
+    makeClient: () => Effect.die("Unexpected Sharding.makeClient call"),
+    registerEntity: () => Effect.die("Unexpected Sharding.registerEntity call"),
+    registerSingleton: () => Effect.die("Unexpected Sharding.registerSingleton call"),
+    send: () => Effect.die("Unexpected Sharding.send call"),
+    sendOutgoing: () => Effect.die("Unexpected Sharding.sendOutgoing call"),
+    notify: () => Effect.die("Unexpected Sharding.notify call"),
+    reset: () => Effect.die("Unexpected Sharding.reset call"),
+    pollStorage: Effect.die("Unexpected Sharding.pollStorage call"),
+    activeEntityCount: Effect.die("Unexpected Sharding.activeEntityCount call"),
+    ...overrides,
+  });
 
 const makeMessageCheckinMember = (memberId: string) =>
   new MessageCheckinMember({
@@ -756,6 +784,79 @@ describe("dispatch workflow registry", () => {
     expect(updateOriginalInteractionResponse).toHaveBeenCalledWith("interaction-token", {
       content: "Dispatch failed. Please try again.",
     });
+  });
+
+  it("routes check-in button workflows through the dispatch button entity", async () => {
+    const expectedExecutionId = await Effect.runPromise(
+      dispatchWorkflowRegistry.checkinButton.workflow.executionId({
+        requester,
+        payload: checkinButtonPayload,
+      }),
+    );
+    const checkinButton = vi.fn((payload: unknown) =>
+      Effect.sync(() => {
+        expect(payload).toEqual({
+          request: {
+            requester,
+            payload: checkinButtonPayload,
+          },
+          executionId: expectedExecutionId,
+        });
+        return {
+          messageId: checkinButtonPayload.messageId,
+          messageChannelId: "channel-1",
+          checkedInMemberId: requester.accountId,
+        } satisfies CheckinHandleButtonResult;
+      }),
+    );
+    const makeClient = vi.fn((entityId: string) => {
+      expect(entityId).toBe(checkinButtonPayload.messageId);
+      return { checkinButton } as never;
+    });
+
+    await Effect.runPromise(
+      DispatchCheckinButtonWorkflow.execute({
+        requester,
+        payload: checkinButtonPayload,
+      }).pipe(
+        Effect.tap((result) =>
+          Effect.sync(() =>
+            expect(result).toEqual({
+              messageId: checkinButtonPayload.messageId,
+              messageChannelId: "channel-1",
+              checkedInMemberId: requester.accountId,
+            }),
+          ),
+        ),
+        Effect.provide(
+          DispatchCheckinButtonWorkflow.toLayer(
+            makeButtonWorkflowHandler({ ...dispatchWorkflowRegistry.checkinButton }),
+          ),
+        ),
+        Effect.provideService(
+          Sharding.Sharding,
+          makeShardingMock({
+            makeClient: () => Effect.succeed(makeClient),
+          }),
+        ),
+        Effect.provideService(DispatchService, makeDispatchServiceMock({})),
+        Effect.provide(
+          Layer.succeed(SheetApisClient)(
+            makeSheetApisClientMock({
+              getMessageCheckinMembers: () =>
+                Effect.succeed([makeMessageCheckinMember(requester.accountId)]),
+            }),
+          ),
+        ),
+        Effect.provideService(IngressBotClient, {
+          updateOriginalInteractionResponse: () => Effect.void,
+        } as never),
+        Effect.provide(WorkflowEngine.layerMemory),
+      ),
+    );
+
+    expect(makeClient).toHaveBeenCalledTimes(1);
+    expect(checkinButton).toHaveBeenCalledTimes(1);
   });
 
   it("authorizes slot open buttons from modern message slot records", async () => {

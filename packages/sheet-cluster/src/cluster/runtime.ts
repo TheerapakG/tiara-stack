@@ -15,10 +15,10 @@ import { HttpRouter } from "effect/unstable/http";
 import { RpcSerialization } from "effect/unstable/rpc";
 import { createServer } from "node:http";
 import { config } from "@/config";
-import { AutoCheckinService } from "@/services";
+import { AutoCheckinService, DispatchService, IngressBotClient, SheetApisClient } from "@/services";
 import { autoCheckinWorkflowLayer } from "@/workflows/autoCheckin";
 import { getClusterRunnerReadinessSnapshot, postgresSqlLayer } from "@/services";
-import { dispatchWorkflowLayer } from "@/workflows/dispatch";
+import { dispatchButtonEntityLayer, dispatchWorkflowLayer } from "@/workflows/dispatch";
 import { smokeWorkflowLayer } from "@/workflows/smoke";
 
 const shardGroups = ["dispatch", "autoCheckin"] as const;
@@ -113,13 +113,21 @@ const clusterStartupLayer = Layer.effectDiscard(
   }),
 );
 
+const dispatchClientsLayer = Layer.mergeAll(IngressBotClient.layer, SheetApisClient.layer);
+
+const dispatchServicesLayer = Layer.effect(DispatchService, DispatchService.make).pipe(
+  Layer.provideMerge(dispatchClientsLayer),
+);
+
 export const clusterLayer = Layer.mergeAll(
+  dispatchButtonEntityLayer,
   dispatchWorkflowLayer,
   autoCheckinWorkflowLayer,
   smokeWorkflowLayer,
   clusterStartupLayer,
 ).pipe(
   Layer.provide(AutoCheckinService.layer),
+  Layer.provide(dispatchServicesLayer),
   Layer.provide(ClusterWorkflowEngine.layer),
   Layer.provideMerge(clusterRunnerLayer),
   Layer.provide(postgresSqlLayer),
